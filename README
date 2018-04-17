@@ -1,0 +1,4 @@
+# How to install
+
+    make install
+    psql -c "CREATE EXTENSION cuckoo"
