@@ -27,6 +27,7 @@ dependencies:
 - mtl
 - containers
 - MissingH
+- ansi-wl-pprint
 
 library:
   source-dirs: src

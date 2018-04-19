@@ -11,7 +11,11 @@ import Parser
 
 import Text.Show.Pretty as PP hiding (List, Value, Float)
 
+import GetTable
 import qualified InAST as A
+import Inference as I
+import Extract as E
+import Print as P
 
 const1 :: A.Operator
 const1 = A.RESULT
@@ -44,12 +48,26 @@ main = do
     let cp = forceEither config
     let authStr = forceEither $ get cp "Main" "dbauth" :: String
 
-    putStrLn $ "Validate const1:"
-    let errs = V.validateOperator const1
-    putStrLn $ PP.ppShow errs
+    -- putStrLn $ "Validate const1:"
+    -- let errs = V.validateOperator const1
+    -- putStrLn $ PP.ppShow errs
 
-    const0' <- L.parseConst authStr const0
-    putStrLn $ PP.ppShow const0'
+    -- const0' <- L.parseConst authStr const0
+    -- putStrLn $ PP.ppShow const0'
+    tableDataR <- getTableData authStr
+
+    let consts = E.extract const1
+    putStrLn $ PP.ppShow consts
+
+    consts' <- mapM (\x -> L.parseConst authStr x >>= \p -> return (x, p)) consts
+
+    putStrLn $ PP.ppShow consts'
+
+    let infered = generatePlan tableDataR consts' const1
+
+    putStrLn $ PP.ppShow infered
+
+    putStrLn $ P.print infered
 
     -- case cmdArgs of
     --     [_]  -> putStrLn "Insert a string"

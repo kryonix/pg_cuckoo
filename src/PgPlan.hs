@@ -22,6 +22,13 @@ module PgPlan ( Null(..)
               , Plan(..)
               , Expr(..)
               , Seq(..)
+              , TargetEntry(..)
+              , RelationList(..)
+              , Bitmapset(..)
+              , Alias(..)
+              , RangeEx(..)
+              , List(..)
+              , PgBool(..)
               ) where
 
 import Data.Data
@@ -31,21 +38,33 @@ import Data.Data
 data Null = Null
     deriving (Eq, Show, Data, Typeable)
 
+data List a = List [a]
+    deriving (Eq, Show, Data, Typeable)
+
+data PgBool = PgBool Bool
+    deriving (Eq, Show, Data, Typeable)
+
+pgFalse :: PgBool
+pgFalse = PgBool False
+
+pgTrue :: PgBool
+pgTrue = PgBool True
+
 data PlannedStmt = PlannedStmt
                     { commandType            :: Integer   -- Constant 1 (SELECT)
                     , queryId                :: Integer   -- Constant 0, doesn't matter
-                    , hasReturning           :: Bool      -- is it insert|update|delete RETURNING?
-                    , hasModifyingCTE        :: Bool      -- has insert|update|delete in WITH?
-                    , canSetTag              :: Bool      -- do I set the command result tag?
-                    , transientPlan          :: Bool      -- redo plan when TransactionXmin changes?
-                    , dependsOnRole          :: Bool      -- is plan specific to current role?
-                    , parallelModeNeeded     :: Bool      -- parallel mode required to execute?
+                    , hasReturning           :: PgBool      -- is it insert|update|delete RETURNING?
+                    , hasModifyingCTE        :: PgBool      -- has insert|update|delete in WITH?
+                    , canSetTag              :: PgBool      -- do I set the command result tag?
+                    , transientPlan          :: PgBool      -- redo plan when TransactionXmin changes?
+                    , dependsOnRole          :: PgBool      -- is plan specific to current role?
+                    , parallelModeNeeded     :: PgBool      -- parallel mode required to execute?
                     , planTree               :: Plan      -- tree of Plan nodes
-                    , rtable                 :: [RangeEx] -- list of RangeTblEntry nodes
+                    , rtable                 :: List RangeEx -- list of RangeTblEntry nodes
                     , resultRelations        :: Null      -- rtable indexes of target relations for INSERT/UPDATE/DELETE
                     , nonleafResultRelations :: Null      -- rtable indexes of non-leaf target relations for UPDATE/DELETE
                     , rootResultRelations    :: Null      -- rtable indexes of root target relations for UPDATE/DELETE
-                    , subplans               :: [Plan]    -- Plan trees for SubPlan expressions
+                    , subplans               :: List Plan    -- Plan trees for SubPlan expressions
                     , rewindPlanIDs          :: Bitmapset -- indices of subplans that require REWIND
                     , rowMarks               :: Null      -- a list of PlanRowMark's
                     , relationOids           :: RelationList -- OIDs of relations the plan depends on
@@ -64,18 +83,18 @@ defaultPlannedStmt :: PlannedStmt
 defaultPlannedStmt = PlannedStmt
                       { commandType=1
                       , queryId=0
-                      , hasReturning=False
-                      , hasModifyingCTE=False
-                      , canSetTag=True
-                      , transientPlan=False
-                      , dependsOnRole=False
-                      , parallelModeNeeded=False
+                      , hasReturning=pgFalse
+                      , hasModifyingCTE=pgFalse
+                      , canSetTag=pgTrue
+                      , transientPlan=pgFalse
+                      , dependsOnRole=pgFalse
+                      , parallelModeNeeded=pgFalse
                       , planTree=RESULT defaultPlan Nothing
-                      , rtable=[]
+                      , rtable=List []
                       , resultRelations=Null
                       , nonleafResultRelations=Null
                       , rootResultRelations=Null
-                      , subplans=[]
+                      , subplans=List []
                       , rewindPlanIDs=Bitmapset []
                       , rowMarks=Null
                       , relationOids=RelationList []
@@ -92,10 +111,10 @@ data GenericPlan = GenericPlan
                     , total_cost     :: Double     -- total cost (assuming all tuples fetched)
                     , plan_rows      :: Integer    -- number of rows plan is expected to emit
                     , plan_width     :: Integer    -- average row width in bytes
-                    , parallel_aware :: Bool       -- engage parallel-aware logic?
-                    , parallel_safe  :: Bool       -- OK to use as part of parallel plan?
+                    , parallel_aware :: PgBool       -- engage parallel-aware logic?
+                    , parallel_safe  :: PgBool       -- OK to use as part of parallel plan?
                     , plan_node_id   :: Integer    -- unique across entire final plan tree
-                    , targetlist     :: [TargetEntry]     -- target list to be computed at this node
+                    , targetlist     :: List TargetEntry     -- target list to be computed at this node
                     , qual           :: Maybe Expr -- implicitly-ANDed qual conditions
                     , lefttree       :: Maybe Plan -- input plan tree(s)
                     , righttree      :: Maybe Plan -- input
@@ -119,10 +138,10 @@ defaultPlan = GenericPlan
               , total_cost=0.0
               , plan_rows=0
               , plan_width=0
-              , parallel_aware=False
-              , parallel_safe=False
+              , parallel_aware=pgFalse
+              , parallel_safe=pgFalse
               , plan_node_id=0
-              , targetlist=[]
+              , targetlist=List []
               , qual=Nothing
               , lefttree=Nothing
               , righttree=Nothing
@@ -171,9 +190,9 @@ data RangeEx = RTE
                 , relid         :: Integer  -- OID of the relation
                 , relkind       :: String   -- relation kind (see pg_class.relkind)
                 , tablesample   :: Null
-                , lateral       :: Bool
-                , inh           :: Bool      -- Const false?
-                , inFromCl      :: Bool      -- Const true?
+                , lateral       :: PgBool
+                , inh           :: PgBool      -- Const false?
+                , inFromCl      :: PgBool      -- Const true?
                 , requiredPerms :: Integer   -- Const 2?
                 , checkAsUser   :: Integer   -- Const 0?
                 , selectedCols  :: Bitmapset
@@ -185,7 +204,7 @@ data RangeEx = RTE
 
 data Alias = Alias
              { aliasname :: String
-             , colnames  :: [String] }
+             , colnames  :: List String }
     deriving (Eq, Show, Data, Typeable)
 
 
@@ -209,7 +228,7 @@ data TargetEntry = TargetEntry
                     , ressortgroupref :: Integer
                     , resorigtbl      :: Integer
                     , resorigcol      :: Integer
-                    , resjunk         :: Bool
+                    , resjunk         :: PgBool
                     }
     deriving (Eq, Show, Data, Typeable)
 
@@ -242,9 +261,10 @@ data Expr = VAR
           | CONST
             { consttype   :: Integer
             , consttypmod :: Integer
+            , constcollid :: Integer
             , constlen    :: Integer
-            , constbyval  :: Bool
-            , constisnull :: Bool
+            , constbyval  :: PgBool
+            , constisnull :: PgBool
             , location    :: Integer
             , constvalue  :: Maybe Seq
             }

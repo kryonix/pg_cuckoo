@@ -16,15 +16,17 @@ translate :: Chunk -> O.Expr
 translate (Chunk "CONST" fs) 
         = O.CONST { consttype=consttype
                   , consttypmod=consttypmod
+                  , constcollid=constcollid
                   , constlen=constlen
-                  , constbyval=constbyval
-                  , constisnull=constisnull
+                  , constbyval=PgBool constbyval
+                  , constisnull=PgBool constisnull
                   , location= -1
                   , constvalue=constvalue
                   }
     where
         (Int consttype) = fs ! "consttype"
         (Int consttypmod) = fs ! "consttypmod"
+        (Int constcollid) = fs ! "constcollid"
         (Int constlen)    = fs ! "constlen"
         (Bool constbyval) = fs ! "constbyval"
         (Bool constisnull) = fs ! "constisnull"

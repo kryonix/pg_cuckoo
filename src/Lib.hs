@@ -48,6 +48,6 @@ parseConst authStr p@(I.CONST {I.constvalue=constvalue, I.consttype=consttype})
     -- Parse the query-tree
     let f = head $ parseLog querylog
 
-    let finalConst = trace (show f) $ T.translate f
+    let finalConst = T.translate f
     return finalConst
 
