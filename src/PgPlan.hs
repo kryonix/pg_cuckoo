@@ -9,15 +9,19 @@ See: src/postgres/include/nodes/plannodes.h
      src/postgres/include/nodes/primnodes.h
 -}
 
-{-# LANGUGAGE PatternSynonyms #-}
+{-# OPTIONS_GHC -fno-warn-unused-matches #-}
+
+{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 
-module PgPlan ( Null
-              , PlannedStmt
+module PgPlan ( Null(..)
+              , PlannedStmt(..)
               , defaultPlannedStmt
-              , GenericPlan
+              , GenericPlan(..)
               , defaultPlan
-              , Plan
+              , Plan(..)
+              , Expr(..)
+              , Seq(..)
               ) where
 
 import Data.Data
@@ -25,17 +29,17 @@ import Data.Data
 -- | Null data-type
 -- Render this as '<>'
 data Null = Null
-    deriving (Eq, Show)
+    deriving (Eq, Show, Data, Typeable)
 
 data PlannedStmt = PlannedStmt
                     { commandType            :: Integer   -- Constant 1 (SELECT)
                     , queryId                :: Integer   -- Constant 0, doesn't matter
-                    , hasReturning           :: Boolean   -- is it insert|update|delete RETURNING?
-                    , hasModifyingCTE        :: Boolean   -- has insert|update|delete in WITH?
-                    , canSetTag              :: Boolean   -- do I set the command result tag?
-                    , transientPlan          :: Boolean   -- redo plan when TransactionXmin changes?
-                    , dependsOnRole          :: Boolean   -- is plan specific to current role?
-                    , parallelModeNeeded     :: Boolean   -- parallel mode required to execute?
+                    , hasReturning           :: Bool      -- is it insert|update|delete RETURNING?
+                    , hasModifyingCTE        :: Bool      -- has insert|update|delete in WITH?
+                    , canSetTag              :: Bool      -- do I set the command result tag?
+                    , transientPlan          :: Bool      -- redo plan when TransactionXmin changes?
+                    , dependsOnRole          :: Bool      -- is plan specific to current role?
+                    , parallelModeNeeded     :: Bool      -- parallel mode required to execute?
                     , planTree               :: Plan      -- tree of Plan nodes
                     , rtable                 :: [RangeEx] -- list of RangeTblEntry nodes
                     , resultRelations        :: Null      -- rtable indexes of target relations for INSERT/UPDATE/DELETE
@@ -54,7 +58,7 @@ data PlannedStmt = PlannedStmt
     deriving (Eq, Show, Data, Typeable)
 
 data RelationList = RelationList [Integer]
-    deriving (Eq, Show)
+    deriving (Eq, Show, Data, Typeable)
 
 defaultPlannedStmt :: PlannedStmt
 defaultPlannedStmt = PlannedStmt
@@ -66,13 +70,14 @@ defaultPlannedStmt = PlannedStmt
                       , transientPlan=False
                       , dependsOnRole=False
                       , parallelModeNeeded=False
-                      , planTree=defaultPlan
+                      , planTree=RESULT defaultPlan Nothing
                       , rtable=[]
                       , resultRelations=Null
                       , nonleafResultRelations=Null
                       , rootResultRelations=Null
                       , subplans=[]
                       , rewindPlanIDs=Bitmapset []
+                      , rowMarks=Null
                       , relationOids=RelationList []
                       , invalItems=Null
                       , nParamExec=0
@@ -87,10 +92,10 @@ data GenericPlan = GenericPlan
                     , total_cost     :: Double     -- total cost (assuming all tuples fetched)
                     , plan_rows      :: Integer    -- number of rows plan is expected to emit
                     , plan_width     :: Integer    -- average row width in bytes
-                    , parallel_aware :: Boolean    -- engage parallel-aware logic?
-                    , parallel_safe  :: Boolean    -- OK to use as part of parallel plan?
+                    , parallel_aware :: Bool       -- engage parallel-aware logic?
+                    , parallel_safe  :: Bool       -- OK to use as part of parallel plan?
                     , plan_node_id   :: Integer    -- unique across entire final plan tree
-                    , targetlist     :: [Expr]     -- target list to be computed at this node
+                    , targetlist     :: [TargetEntry]     -- target list to be computed at this node
                     , qual           :: Maybe Expr -- implicitly-ANDed qual conditions
                     , lefttree       :: Maybe Plan -- input plan tree(s)
                     , righttree      :: Maybe Plan -- input
@@ -101,7 +106,12 @@ data GenericPlan = GenericPlan
     deriving(Eq, Show, Data, Typeable)
 
 data Bitmapset = Bitmapset [Integer]
-    deriving(Eq, Show)
+    deriving (Eq, Show, Data, Typeable)
+
+data Seq = Seq 
+            { seqlength :: Integer
+            , seqvalues :: [Integer] }
+    deriving (Eq, Show, Data, Typeable)
 
 defaultPlan :: GenericPlan
 defaultPlan = GenericPlan
@@ -161,9 +171,9 @@ data RangeEx = RTE
                 , relid         :: Integer  -- OID of the relation
                 , relkind       :: String   -- relation kind (see pg_class.relkind)
                 , tablesample   :: Null
-                , lateral       :: Boolean
-                , inh           :: Boolean   -- Const false?
-                , inFromCl      :: Boolean   -- Const true?
+                , lateral       :: Bool
+                , inh           :: Bool      -- Const false?
+                , inFromCl      :: Bool      -- Const true?
                 , requiredPerms :: Integer   -- Const 2?
                 , checkAsUser   :: Integer   -- Const 0?
                 , selectedCols  :: Bitmapset
@@ -178,8 +188,64 @@ data Alias = Alias
              , colnames  :: [String] }
     deriving (Eq, Show, Data, Typeable)
 
--- How to implement this?
--- Use LogParser.AST? How can we infere all
--- information needed?
--- BIG problem!
-data Expr = ???
+
+{-TARGETENTRY         
+:expr (...)          expression to evaluate
+:resno 1             attribute number In a SELECT's targetlist,
+                        * resno should always be equal to the 
+                        * item's ordinal position (counting from 1)
+:resname a           name of the column (could be NULL)
+:ressortgroupref 0   nonzero if referenced by a sort/group clause
+:resorigtbl ID       OID of column's source table
+:resorigcol [1,n]    column's number in source table
+:resjunk false       set to true to eliminate the attribute from final target list
+-}
+
+-- {resorigtbl, resorigcol} will be 0 if expr is e.g. a CONST (more cases to be determined)
+data TargetEntry = TargetEntry
+                    { expr            :: Expr
+                    , resno           :: Integer
+                    , resname         :: Maybe String
+                    , ressortgroupref :: Integer
+                    , resorigtbl      :: Integer
+                    , resorigcol      :: Integer
+                    , resjunk         :: Bool
+                    }
+    deriving (Eq, Show, Data, Typeable)
+
+
+{-VAR              
+:varno [1,n]          index of this var's relation in the range table, or INNER_VAR/OUTER_VAR/INDEX_VAR
+:varattno [0,m]       attribute number of this var, or zero for all
+:vartype 23       
+:vartypmod -1     pg_attribute typmod value
+:varcollid 0      OID of collation, or InvalidOid if none
+:varlevelsup 0    for subquery variables referencing outer
+                                 * relations; 0 in a normal var, >0 means N
+                                 * levels up
+:varnoold n       original value of varno, for debugging
+:varoattno m      original value of varattno
+:location -1      token location, or -1 if unknown
+-}
+
+data Expr = VAR
+            { varno       :: Integer
+            , varattno    :: Integer
+            , vartype     :: Integer
+            , vartypmod   :: Integer
+            , varcollid   :: Integer
+            , varlevelsup :: Integer
+            , varnoold    :: Integer
+            , varoattno   :: Integer
+            , location    :: Integer
+            }
+          | CONST
+            { consttype   :: Integer
+            , consttypmod :: Integer
+            , constlen    :: Integer
+            , constbyval  :: Bool
+            , constisnull :: Bool
+            , location    :: Integer
+            , constvalue  :: Maybe Seq
+            }
+    deriving (Eq, Show, Data, Typeable)

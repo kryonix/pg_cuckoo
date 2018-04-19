@@ -22,6 +22,11 @@ dependencies:
 - base >= 4.7 && < 5
 - megaparsec
 - pretty-show
+- HDBC
+- HDBC-postgresql == 2.3.2.5
+- mtl
+- containers
+- MissingH
 
 library:
   source-dirs: src
@@ -36,6 +41,7 @@ executables:
     - -with-rtsopts=-N
     dependencies:
     - cuckoo
+    - ConfigFile
 
 tests:
   cuckoo-test:

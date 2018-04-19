@@ -41,6 +41,9 @@ packages:
 # (e.g., acme-missiles-0.3)
 # extra-deps: []
 
+extra-deps:
+- HDBC-postgresql-2.3.2.5
+
 # Override default flag values for local packages and extra-deps
 # flags: {}
 
