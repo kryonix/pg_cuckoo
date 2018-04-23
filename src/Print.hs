@@ -28,8 +28,8 @@ instance Pretty PgBool where
 instance Pretty Null where
   pretty Null = text "<>"
 
-instance Pretty PlannedStmt where
-  pretty x@(PlannedStmt {})
+instance Pretty PLANNEDSTMT where
+  pretty x@(PLANNEDSTMT {})
     = text "{" <> text "PLANNEDSTMT"
                <+> text ":commandType" <+> pretty (commandType x)
                <+> text ":queryId" <+> pretty (queryId x)
@@ -72,7 +72,7 @@ instance Pretty GenericPlan where
                             <+> text ":parallel_aware" <+> pretty (parallel_aware x)
                             <+> text ":parallel_safe" <+> pretty (parallel_safe x)
                             <+> text ":plan_node_id" <+> pretty (plan_node_id x)
-                            <+> text ":targetlist" <+> pretty (targetlist x)
+                            <+> text ":targetlist" <+> listPretty (targetlist x)
                             <+> text ":qual" <+> maybePretty (qual x)
                             <+> text ":lefttree" <+> maybePretty (lefttree x)
                             <+> text ":righttree" <+> maybePretty (righttree x)
@@ -130,8 +130,8 @@ instance Pretty Alias where
                         <+> text ":colnames" <+> parens (hsep (map (dquotes . pretty) ((\(List p) -> p) $ colnames x)))
                         <> text "}"
 
-instance Pretty TargetEntry where
-  pretty x@(TargetEntry {}) = text "{TARGETENTRY"
+instance Pretty TARGETENTRY where
+  pretty x@(TARGETENTRY {}) = text "{TARGETENTRY"
                             <+> text ":expr" <+> pretty (expr x)
                             <+> text ":resno" <+> pretty (resno x)
                             <+> text ":resname" <+> maybePretty (resname x)

@@ -17,7 +17,7 @@ import qualified PgPlan as O
 --------------------------------------------------------------------------------
 -- Exported functions
 
-generatePlan :: TableData -> [(I.Expr, O.Expr)] -> I.Operator -> O.PlannedStmt
+generatePlan :: TableData -> [(I.Expr, O.Expr)] -> I.Operator -> O.PLANNEDSTMT
 generatePlan tableD exprs ast = let
     (stmt, lg) = runOperSem (trOperator ast) (StateI 0) (C tableD exprs)
     res = case stmt of
@@ -91,13 +91,13 @@ trOperator (I.RESULT { I.targetlist=targetlist, I.qual=qual})
     qual'       <- mapM trExpr qual
     return $ O.RESULT (O.defaultPlan {O.targetlist=O.List targetlist'}) qual'
 
-trTargetEntry :: Rule (I.TargetEntry, Integer) O.TargetEntry
+trTargetEntry :: Rule (I.TargetEntry, Integer) O.TARGETENTRY
 trTargetEntry (I.TargetEntry { I.targetexpr=targetexpr
                             , I.targetresname=targetresname }, resno)
   = do
     targetexpr' <- trExpr targetexpr
 
-    return $ O.TargetEntry
+    return $ O.TARGETENTRY
               { O.expr            = targetexpr'
               , O.resno           = resno
               , O.resname         = Just targetresname

@@ -15,7 +15,8 @@ import GetTable
 import qualified InAST as A
 import Inference as I
 import Extract as E
-import Print as P
+
+import GPrint
 
 const1 :: A.Operator
 const1 = A.RESULT
@@ -28,8 +29,6 @@ const1 = A.RESULT
           , A.qual = Nothing
           }
 
-
-const0 = A.CONST "42" "int4"
 
 -- access list elements safely
 (!!) :: [a] -> Int -> Maybe a
@@ -48,12 +47,10 @@ main = do
     let cp = forceEither config
     let authStr = forceEither $ get cp "Main" "dbauth" :: String
 
-    -- putStrLn $ "Validate const1:"
-    -- let errs = V.validateOperator const1
-    -- putStrLn $ PP.ppShow errs
+    putStrLn $ "Validate const1:"
+    let errs = V.validateOperator const1
+    putStrLn $ PP.ppShow errs
 
-    -- const0' <- L.parseConst authStr const0
-    -- putStrLn $ PP.ppShow const0'
     tableDataR <- getTableData authStr
 
     let consts = E.extract const1
@@ -67,12 +64,4 @@ main = do
 
     putStrLn $ PP.ppShow infered
 
-    putStrLn $ P.print infered
-
-    -- case cmdArgs of
-    --     [_]  -> putStrLn "Insert a string"
-    --     _:x:_ -> do
-
-            -- x' <- readFile x
-            -- let erg = parseStr x'
-            -- putStrLn $ ppShow erg
+    putStrLn $ gprint infered

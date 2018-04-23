@@ -12,45 +12,101 @@ See: src/postgres/include/nodes/plannodes.h
 {-# OPTIONS_GHC -fno-warn-unused-matches #-}
 
 {-# LANGUAGE PatternSynonyms #-}
-{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE FlexibleContexts, FlexibleInstances #-}
 
 module PgPlan ( Null(..)
-              , PlannedStmt(..)
+              , PLANNEDSTMT(..)
               , defaultPlannedStmt
               , GenericPlan(..)
               , defaultPlan
               , Plan(..)
               , Expr(..)
               , Seq(..)
-              , TargetEntry(..)
+              , TARGETENTRY(..)
               , RelationList(..)
               , Bitmapset(..)
               , Alias(..)
               , RangeEx(..)
               , List(..)
               , PgBool(..)
+              , Test(..)
               ) where
 
-import Data.Data
+import GPrint
+import GHC.Generics
+import Data.List
+
+--------------------------------------------------------------------------------
+-- BASE DATA TYPES
 
 -- | Null data-type
 -- Render this as '<>'
 data Null = Null
-    deriving (Eq, Show, Data, Typeable)
+    deriving (Eq, Show)
 
 data List a = List [a]
-    deriving (Eq, Show, Data, Typeable)
+    deriving (Eq, Show)
 
 data PgBool = PgBool Bool
-    deriving (Eq, Show, Data, Typeable)
+    deriving (Eq, Show)
+
+data RelationList = RelationList [Integer]
+    deriving (Eq, Show)
+
+data Bitmapset = Bitmapset [Integer]
+    deriving (Eq, Show)
+
+data Seq = Seq 
+            { seqlength :: Integer
+            , seqvalues :: [Integer] }
+    deriving (Eq, Show)
+
 
 pgFalse :: PgBool
 pgFalse = PgBool False
 
 pgTrue :: PgBool
 pgTrue = PgBool True
+-- / BASE DATA TYPES
+--------------------------------------------------------------------------------
+-- GPrint instances for base types
 
-data PlannedStmt = PlannedStmt
+data Test = Test {foo :: Integer, baz :: Double}
+          | Baum { krach :: Integer }
+          | Tee { good :: List Integer }
+          | Bar { bad :: List Test }
+          | Boom { v :: Null }
+          | B2 { bb :: PgBool }
+    deriving (Generic, GPrint)
+
+
+instance (GPrint a) => GPrint (List a) where
+  gprint (List []) = "<>"
+  gprint (List xs) = "(" ++ (intercalate " " $ map gprint xs) ++ ")"
+
+instance GPrint Bitmapset where
+  gprint (Bitmapset []) = "(b)"
+  gprint (Bitmapset xs) = "(b " ++ (intercalate " " $ map gprint xs) ++ ")"
+
+instance GPrint RelationList where
+  gprint (RelationList []) = "<>"
+  gprint (RelationList xs) = "(o " ++ (intercalate " " $ map gprint xs) ++ ")"
+
+instance GPrint PgBool where
+  gprint (PgBool x) = gprint x
+
+instance GPrint Null where
+  gprint Null = "<>"
+
+instance GPrint Seq where
+  gprint (Seq l v) = show l ++ " [ " ++ intercalate " " (map show v) ++ " ]"
+-- / GPrint instances for base types
+--------------------------------------------------------------------------------
+-- Complex data types
+
+data PLANNEDSTMT = PLANNEDSTMT
                     { commandType            :: Integer   -- Constant 1 (SELECT)
                     , queryId                :: Integer   -- Constant 0, doesn't matter
                     , hasReturning           :: PgBool      -- is it insert|update|delete RETURNING?
@@ -74,13 +130,10 @@ data PlannedStmt = PlannedStmt
                     , stmt_location          :: Integer   -- start location, or -1 if unknown
                     , stmt_len               :: Integer   -- length in bytes; 0 means "rest of string"
                     }
-    deriving (Eq, Show, Data, Typeable)
+    deriving (Eq, Show, Generic, GPrint)
 
-data RelationList = RelationList [Integer]
-    deriving (Eq, Show, Data, Typeable)
-
-defaultPlannedStmt :: PlannedStmt
-defaultPlannedStmt = PlannedStmt
+defaultPlannedStmt :: PLANNEDSTMT
+defaultPlannedStmt = PLANNEDSTMT
                       { commandType=1
                       , queryId=0
                       , hasReturning=pgFalse
@@ -114,7 +167,7 @@ data GenericPlan = GenericPlan
                     , parallel_aware :: PgBool       -- engage parallel-aware logic?
                     , parallel_safe  :: PgBool       -- OK to use as part of parallel plan?
                     , plan_node_id   :: Integer    -- unique across entire final plan tree
-                    , targetlist     :: List TargetEntry     -- target list to be computed at this node
+                    , targetlist     :: List TARGETENTRY     -- target list to be computed at this node
                     , qual           :: Maybe Expr -- implicitly-ANDed qual conditions
                     , lefttree       :: Maybe Plan -- input plan tree(s)
                     , righttree      :: Maybe Plan -- input
@@ -122,15 +175,7 @@ data GenericPlan = GenericPlan
                     , extParam       :: Bitmapset  -- (b id₁ ... idₙ)
                     , allParam       :: Bitmapset  -- (b id₁ ... idₙ)
                     }
-    deriving(Eq, Show, Data, Typeable)
-
-data Bitmapset = Bitmapset [Integer]
-    deriving (Eq, Show, Data, Typeable)
-
-data Seq = Seq 
-            { seqlength :: Integer
-            , seqvalues :: [Integer] }
-    deriving (Eq, Show, Data, Typeable)
+    deriving(Eq, Show, Generic, GPrint)
 
 defaultPlan :: GenericPlan
 defaultPlan = GenericPlan
@@ -181,7 +226,7 @@ data Plan = RESULT
             , limitOffset :: Maybe Expr  -- OFFSET parameter, or NULL if none 
             , limitCount  :: Maybe Expr  -- COUNT parameter, or NULL if none
             }
-    deriving (Eq, Show, Data, Typeable)
+    deriving (Eq, Show, Generic, GPrint)
 
 data RangeEx = RTE
                 { alias         :: Maybe Alias
@@ -200,12 +245,12 @@ data RangeEx = RTE
                 , updatedCols   :: Bitmapset -- Const []
                 , securityQuals :: Null
                 }
-    deriving (Eq, Show, Data, Typeable)
+    deriving (Eq, Show, Generic, GPrint)
 
 data Alias = Alias
              { aliasname :: String
              , colnames  :: List String }
-    deriving (Eq, Show, Data, Typeable)
+    deriving (Eq, Show, Generic, GPrint)
 
 
 {-TARGETENTRY         
@@ -221,7 +266,7 @@ data Alias = Alias
 -}
 
 -- {resorigtbl, resorigcol} will be 0 if expr is e.g. a CONST (more cases to be determined)
-data TargetEntry = TargetEntry
+data TARGETENTRY = TARGETENTRY
                     { expr            :: Expr
                     , resno           :: Integer
                     , resname         :: Maybe String
@@ -230,7 +275,7 @@ data TargetEntry = TargetEntry
                     , resorigcol      :: Integer
                     , resjunk         :: PgBool
                     }
-    deriving (Eq, Show, Data, Typeable)
+    deriving (Eq, Show, Generic, GPrint)
 
 
 {-VAR              
@@ -268,4 +313,6 @@ data Expr = VAR
             , location    :: Integer
             , constvalue  :: Maybe Seq
             }
-    deriving (Eq, Show, Data, Typeable)
+    deriving (Eq, Show, Generic, GPrint)
+
+-- / Complex data types
