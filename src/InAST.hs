@@ -18,6 +18,11 @@ data Operator = SEQSCAN
                 { targetlist :: [TargetEntry]
                 , qual       :: Maybe Expr
                 }
+              | LIMIT
+                { operator :: Operator
+                , limitOffset :: Maybe Expr
+                , limitCount  :: Maybe Expr
+                }
     deriving(Eq, Show)
 
 

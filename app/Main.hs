@@ -46,6 +46,13 @@ seq1 = A.SEQSCAN
         , A.scanrelation="grp"
         }
 
+seq2 :: A.Operator
+seq2 = A.LIMIT
+        { A.operator = seq1
+        , A.limitOffset = Nothing
+        , A.limitCount  = Just (A.CONST "1" "int8")
+        }
+
 -- access list elements safely
 (!!) :: [a] -> Int -> Maybe a
 (!!) lst idx = if idx >= length lst
@@ -64,19 +71,19 @@ main = do
     let authStr = forceEither $ get cp "Main" "dbauth" :: String
 
     putStrLn $ "Validate const1:"
-    let errs = V.validateOperator seq1
+    let errs = V.validateOperator seq2
     putStrLn $ PP.ppShow errs
 
     tableDataR <- getTableData authStr
 
-    let consts = E.extract seq1
+    let consts = E.extract seq2
     putStrLn $ PP.ppShow consts
 
     consts' <- mapM (\x -> L.parseConst authStr x >>= \p -> return (x, p)) $ lgconsts consts
 
     putStrLn $ PP.ppShow consts'
 
-    let infered = generatePlan tableDataR consts' (lgTableNames consts) seq1
+    let infered = generatePlan tableDataR consts' (lgTableNames consts) seq2
 
     putStrLn $ PP.ppShow infered
 

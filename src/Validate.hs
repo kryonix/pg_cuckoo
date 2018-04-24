@@ -51,9 +51,9 @@ validateExpr op = let
 -- | Operator validator
 (~>) :: Rule I.Operator ()
 (~>) (SEQSCAN { targetlist=targetlist
-                    , qual=qual
-                    , scanrelation=scanrelation
-                    })
+              , qual=qual
+              , scanrelation=scanrelation
+              })
   = do
     mapM_ (~~~>) targetlist
     mapM_ (~~>) qual
@@ -65,6 +65,14 @@ validateExpr op = let
   = do
     mapM_ (~~~>) targetlist
     mapM_ (~~>) qual
+
+(~>) (LIMIT { operator=operator
+            , limitOffset=limitOffset
+            , limitCount=limitCount})
+  = do
+    (~>) operator
+    mapM_ (~~>) limitOffset
+    mapM_ (~~>) limitCount
 
 -- | TargetEntry validator
 (~~~>) :: Rule I.TargetEntry ()

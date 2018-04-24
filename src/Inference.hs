@@ -155,6 +155,17 @@ trOperator (I.SEQSCAN { I.targetlist=targetlist
     return $ O.SEQSCAN (O.defaultPlan { O.targetlist=O.List targetlist'
                                       , O.qual=qual'}) index'
 
+trOperator (I.LIMIT { I.operator=operator
+                    , I.limitOffset=limitOffset
+                    , I.limitCount=limitCount })
+  = do
+    operator'    <- trOperator operator
+    limitOffset' <- mapM trExpr limitOffset
+    limitCount'  <- mapM trExpr limitCount
+
+    return $ O.LIMIT (O.defaultPlan { O.targetlist=O.targetlist (O.genericPlan operator')
+                                    , O.lefttree=Just operator' }) limitOffset' limitCount'
+
 trTargetEntry :: Rule (I.TargetEntry, Integer) O.TARGETENTRY
 trTargetEntry (I.TargetEntry { I.targetexpr=targetexpr
                             , I.targetresname=targetresname }, resno)
