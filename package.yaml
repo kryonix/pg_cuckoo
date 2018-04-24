@@ -28,6 +28,7 @@ dependencies:
 - containers
 - MissingH
 - ansi-wl-pprint
+- convertible
 
 library:
   source-dirs: src

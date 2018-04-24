@@ -5,36 +5,42 @@ Author      : Denis Hirn
 
 -}
 
-module Extract ( extract ) where
+module Extract ( extract, Log(..) ) where
 
 import OperSem
 import InAST as I
 
-data Log = Log { consts :: [I.Expr] }
+data Log = Log { lgconsts :: [I.Expr]
+               , lgTableNames :: [String]
+               }
+  deriving(Show)
 
 instance Monoid Log where
-    mempty = Log []
-    (Log e1) `mappend` (Log e2) = Log (e1++e2)
+    mempty = Log [] []
+    (Log e1 e2) `mappend` (Log n1 n2) = Log (e1++n1) (e2++n2)
 
 logConst :: Rule I.Expr ()
-logConst expr = tell (Log [expr])
+logConst expr = tell (Log [expr] [])
+
+logTable :: Rule String ()
+logTable tname = tell (Log [] [tname])
 
 type Rule a b = a -> OperSem () () b Log
 
 -- | Extracts nodes
-extract :: I.Operator -> [I.Expr]
+extract :: I.Operator -> Log
 extract op = let
               (_, lg) = runOperSem ((~>) op) () ()
-              (Log lg') = lg
-              in lg'
+              in lg
 
 -- | Operator validator
 (~>) :: Rule I.Operator ()
 (~>) (SEQSCAN { targetlist=targetlist
-                    , qual=qual
-                    , scanrelation=scanrelation
-                    })
+              , qual=qual
+              , scanrelation=scanrelation
+              })
   = do
+    logTable scanrelation
     mapM_ (~~~>) targetlist
     mapM_ (~~>) qual
 
@@ -55,6 +61,8 @@ extract op = let
 -- | Expression validator
 (~~>) :: Rule I.Expr ()
 (~~>) c@(CONST { constvalue=constvalue
-             , consttype=consttype
-             })
+               , consttype=consttype
+               })
   = logConst c
+
+(~~>) e = return ()

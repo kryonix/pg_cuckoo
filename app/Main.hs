@@ -29,6 +29,22 @@ const1 = A.RESULT
           , A.qual = Nothing
           }
 
+-- Query would be: select a as "foo", b as "bar" from grp
+seq1 :: A.Operator
+seq1 = A.SEQSCAN
+        { A.targetlist =
+            [ A.TargetEntry
+                { A.targetexpr = A.VAR {A.varTable="grp", A.varColumn="a"}
+                , A.targetresname = "foo"
+                }
+            , A.TargetEntry 
+                { A.targetexpr = A.VAR {A.varTable="grp", A.varColumn="b"}
+                , A.targetresname = "bar"
+                }
+            ]
+        , A.qual = Nothing
+        , A.scanrelation="grp"
+        }
 
 -- access list elements safely
 (!!) :: [a] -> Int -> Maybe a
@@ -48,19 +64,19 @@ main = do
     let authStr = forceEither $ get cp "Main" "dbauth" :: String
 
     putStrLn $ "Validate const1:"
-    let errs = V.validateOperator const1
+    let errs = V.validateOperator seq1
     putStrLn $ PP.ppShow errs
 
     tableDataR <- getTableData authStr
 
-    let consts = E.extract const1
+    let consts = E.extract seq1
     putStrLn $ PP.ppShow consts
 
-    consts' <- mapM (\x -> L.parseConst authStr x >>= \p -> return (x, p)) consts
+    consts' <- mapM (\x -> L.parseConst authStr x >>= \p -> return (x, p)) $ lgconsts consts
 
     putStrLn $ PP.ppShow consts'
 
-    let infered = generatePlan tableDataR consts' const1
+    let infered = generatePlan tableDataR consts' (lgTableNames consts) seq1
 
     putStrLn $ PP.ppShow infered
 

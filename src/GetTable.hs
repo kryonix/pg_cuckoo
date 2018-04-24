@@ -6,6 +6,8 @@ License     : AllRightsReserved
 Maintainer  : Denis Hirn
 -}
 
+{-# LANGUAGE FlexibleContexts #-}
+
 module GetTable( getTable
                , getTableData
                , findRow
@@ -16,6 +18,7 @@ module GetTable( getTable
                , TableData(..)
                ) where
 
+import Data.Convertible
 import Database.HDBC
 import Database.HDBC.PostgreSQL (connectPostgreSQL)
 
@@ -35,7 +38,7 @@ data TableData = TableData
     deriving (Show)
 
 -- | Get rows that match oid
-findRow :: String -> Integer -> Table -> [Row]
+findRow :: (Convertible a SqlValue) => String -> a -> Table -> [Row]
 findRow idx val t = filter (\x -> x M.! idx == (toSql val)) t
 
 -- | Transform a row into a Data.Map
@@ -52,8 +55,8 @@ getTableData auth = do
     pg_operators <- getTable auth "SELECT oid, oprname, oprleft, oprright, oprresult FROM pg_operator"
     pg_type      <- getTable auth "SELECT oid, typname, typcategory, typelem, typrelid FROM pg_type"
     pg_proc      <- getTable auth "SELECT oid, proname, proargtypes, prorettype, proretset, array_to_string(proallargtypes , ' ') as proallargtypes, array_to_string(proargmodes, ' ') as proargmodes, array_to_string(proargnames, ' ') as proargnames FROM pg_proc"
-    pg_class     <- getTable auth "SELECT oid, relname FROM pg_class"
-    pg_attribute <- getTable auth "SELECT attrelid, attnum, atttypid, attname FROM pg_attribute WHERE attnum > 0"
+    pg_class     <- getTable auth "SELECT oid, relname, relkind FROM pg_class"
+    pg_attribute <- getTable auth "SELECT attrelid, attnum, atttypid, attname, attlen, atttypmod, attcollation FROM pg_attribute WHERE attnum > 0"
 
     let tOperators = tableToMap pg_operators
     let tType      = tableToMap pg_type

@@ -102,6 +102,11 @@ instance GPrint Null where
 
 instance GPrint Seq where
   gprint (Seq l v) = show l ++ " [ " ++ intercalate " " (map show v) ++ " ]"
+
+instance GPrint Alias where
+  gprint (Alias {aliasname=aliasname, colnames=List colnames})
+    = "{ALIAS :aliasname " ++ aliasname ++ " :colnames (" ++ intercalate " " (map show colnames) ++ ")}"
+
 -- / GPrint instances for base types
 --------------------------------------------------------------------------------
 -- Complex data types
@@ -250,7 +255,7 @@ data RangeEx = RTE
 data Alias = Alias
              { aliasname :: String
              , colnames  :: List String }
-    deriving (Eq, Show, Generic, GPrint)
+    deriving (Eq, Show, Generic)
 
 
 {-TARGETENTRY         
