@@ -173,7 +173,7 @@ data GenericPlan = GenericPlan
                     , parallel_safe  :: PgBool       -- OK to use as part of parallel plan?
                     , plan_node_id   :: Integer    -- unique across entire final plan tree
                     , targetlist     :: List TARGETENTRY     -- target list to be computed at this node
-                    , qual           :: Maybe Expr -- implicitly-ANDed qual conditions
+                    , qual           :: List Expr -- implicitly-ANDed qual conditions
                     , lefttree       :: Maybe Plan -- input plan tree(s)
                     , righttree      :: Maybe Plan -- input
                     , initPlan       :: Maybe Plan -- Init Plan nodes (un-correlated expr subselects)
@@ -192,7 +192,7 @@ defaultPlan = GenericPlan
               , parallel_safe=pgFalse
               , plan_node_id=0
               , targetlist=List []
-              , qual=Nothing
+              , qual=List []
               , lefttree=Nothing
               , righttree=Nothing
               , initPlan=Nothing
@@ -225,6 +225,9 @@ data Plan = RESULT
         {-| limit node
             Note: as of Postgres 8.2, the offset and count expressions are expected
             to yield int8, rather than int4 as before.
+
+            Targetlist seems to be just duplicated from child.
+            Use lefttree of genericPlan for child node.
         -}
           | LIMIT
             { genericPlan :: GenericPlan
@@ -317,6 +320,22 @@ data Expr = VAR
             , constisnull :: PgBool
             , location    :: Integer
             , constvalue  :: Maybe Seq
+            }
+  {-| FUNCEXPR
+      COERCE_EXPLICIT_CALL,   /* display as a function call */
+      COERCE_EXPLICIT_CAST,   /* display as an explicit cast */
+      COERCE_IMPLICIT_CAST    /* implicit cast, so hide it */
+  -}
+          | FUNCEXPR
+            { funcid         :: Integer    -- ^ PG_PROC OID of the function
+            , funcresulttype :: Integer    -- ^ PG_TYPE OID of result value
+            , funcretset     :: PgBool     -- ^ true if function returns set
+            , funcvariadic   :: PgBool     -- ^ true if variadic arguments have been combined into an array last argument
+            , funcformat     :: Integer    -- ^ how to display this function call
+            , funccollid     :: Integer    -- ^ OID of collation of result
+            , inputcollid    :: Integer    -- ^ OID of collation that function should use
+            , args           :: List Expr  -- ^ arguments to the function
+            , location       :: Integer
             }
     deriving (Eq, Show, Generic, GPrint)
 

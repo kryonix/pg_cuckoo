@@ -11,12 +11,12 @@ module InAST ( Operator(..)
 
 data Operator = SEQSCAN
                 { targetlist   :: [TargetEntry]
-                , qual         :: Maybe Expr
+                , qual         :: [Expr]
                 , scanrelation :: String
                 }
               | RESULT
-                { targetlist :: [TargetEntry]
-                , qual       :: Maybe Expr
+                { targetlist      :: [TargetEntry]
+                , resconstantqual :: Maybe Expr
                 }
               | LIMIT
                 { operator :: Operator
@@ -38,6 +38,10 @@ data Expr = VAR
             }
           | CONST
             { constvalue :: String
-            , consttype  :: String 
+            , consttype  :: String
+            }
+          | FUNCEXPR
+            { funcname :: String
+            , funcargs :: [Expr]
             }
     deriving (Eq, Show)

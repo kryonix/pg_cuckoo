@@ -5,6 +5,8 @@ Author      : Denis Hirn
 
 -}
 
+{-# LANGUAGE NamedFieldPuns #-}
+
 module Extract ( extract, Log(..) ) where
 
 import OperSem
@@ -44,11 +46,11 @@ extract op = let
     mapM_ (~~~>) targetlist
     mapM_ (~~>) qual
 
-(~>) (RESULT { targetlist=targetlist
-             , qual=qual })
+(~>) (RESULT { targetlist
+             , resconstantqual })
   = do
     mapM_ (~~~>) targetlist
-    mapM_ (~~>) qual
+    mapM_ (~~>) resconstantqual
 
 (~>) (LIMIT { operator=operator
             , limitOffset=limitOffset
@@ -72,5 +74,8 @@ extract op = let
                , consttype=consttype
                })
   = logConst c
+
+(~~>) (FUNCEXPR { funcname, funcargs })
+  = mapM_ (~~>) funcargs
 
 (~~>) e = return ()

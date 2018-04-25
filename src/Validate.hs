@@ -7,6 +7,8 @@ This module does a traversal of the given AST.
 Errors are collected and can then be used for error messages.
 -}
 
+{-# LANGUAGE NamedFieldPuns #-}
+
 module Validate ( validateOperator
                 , validateExpr
                 , isValidOperator
@@ -50,25 +52,19 @@ validateExpr op = let
 
 -- | Operator validator
 (~>) :: Rule I.Operator ()
-(~>) (SEQSCAN { targetlist=targetlist
-              , qual=qual
-              , scanrelation=scanrelation
-              })
+(~>) (SEQSCAN { targetlist, qual, scanrelation })
   = do
     mapM_ (~~~>) targetlist
     mapM_ (~~>) qual
     when (null scanrelation) 
       $ logError $ "SEQSCAN error: scanrelation is empty"
 
-(~>) (RESULT { targetlist=targetlist
-             , qual=qual })
+(~>) (RESULT { targetlist, resconstantqual })
   = do
     mapM_ (~~~>) targetlist
-    mapM_ (~~>) qual
+    mapM_ (~~>) resconstantqual
 
-(~>) (LIMIT { operator=operator
-            , limitOffset=limitOffset
-            , limitCount=limitCount})
+(~>) (LIMIT { operator, limitOffset, limitCount })
   = do
     (~>) operator
     mapM_ (~~>) limitOffset
@@ -76,25 +72,24 @@ validateExpr op = let
 
 -- | TargetEntry validator
 (~~~>) :: Rule I.TargetEntry ()
-(~~~>) (TargetEntry { targetexpr=targetexpr
-                    , targetresname=targetresname
-                    })
+(~~~>) (TargetEntry { targetexpr, targetresname })
   = do
     (~~>) targetexpr
     when (null targetresname) $ logError $ "TargetEntry error: targetresname is empty"
 
 -- | Expression validator
 (~~>) :: Rule I.Expr ()
-(~~>) (VAR { varTable=varTable
-           , varColumn=varColumn
-           })
+(~~>) (VAR { varTable, varColumn })
   = do
     when (null varTable) $ logError $ "VAR error: varTable is empty"
     when (null varColumn) $ logError $ "VAR error: varColumn is empty"
 
-(~~>) (CONST { constvalue=constvalue
-             , consttype=consttype
-             })
+(~~>) (CONST { constvalue, consttype })
   = do
     when (null constvalue) $ logError $ "CONST error: constvalue is empty"
     when (null consttype) $ logError $ "CONST error: consttype is empty"
+
+(~~>) (FUNCEXPR { funcname, funcargs })
+  = do
+    when (null funcname) $ logError $ "FUNCEXPR error: funcname is empty"
+    mapM_ (~~>) funcargs

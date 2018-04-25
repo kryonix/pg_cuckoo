@@ -5,6 +5,8 @@ Author      : Denis Hirn
 
 -}
 
+{-# LANGUAGE NamedFieldPuns #-}
+
 module Inference ( generatePlan ) where
 
 import OperSem
@@ -135,15 +137,13 @@ pgTableToRTE t = O.RTE
 
 
 trOperator :: Rule I.Operator O.Plan
-trOperator (I.RESULT { I.targetlist=targetlist, I.qual=qual})
+trOperator (I.RESULT { I.targetlist=targetlist, I.resconstantqual})
   = do
     targetlist' <- mapM trTargetEntry $ zip targetlist [1..]
-    qual'       <- mapM trExpr qual
+    qual'       <- mapM trExpr resconstantqual
     return $ O.RESULT (O.defaultPlan {O.targetlist=O.List targetlist'}) qual'
 
-trOperator (I.SEQSCAN { I.targetlist=targetlist
-                      , I.qual=qual
-                      , I.scanrelation=scanrelation })
+trOperator (I.SEQSCAN { I.targetlist, I.qual, I.scanrelation })
   = do
     targetlist' <- mapM trTargetEntry $ zip targetlist [1..]
     qual'       <- mapM trExpr qual
@@ -153,11 +153,9 @@ trOperator (I.SEQSCAN { I.targetlist=targetlist
     let (Just index) = elemIndex rtable rtables
     let index' = fromIntegral index + 1
     return $ O.SEQSCAN (O.defaultPlan { O.targetlist=O.List targetlist'
-                                      , O.qual=qual'}) index'
+                                      , O.qual=O.List qual'}) index'
 
-trOperator (I.LIMIT { I.operator=operator
-                    , I.limitOffset=limitOffset
-                    , I.limitCount=limitCount })
+trOperator (I.LIMIT { I.operator, I.limitOffset, I.limitCount })
   = do
     operator'    <- trOperator operator
     limitOffset' <- mapM trExpr limitOffset
@@ -167,8 +165,7 @@ trOperator (I.LIMIT { I.operator=operator
                                     , O.lefttree=Just operator' }) limitOffset' limitCount'
 
 trTargetEntry :: Rule (I.TargetEntry, Integer) O.TARGETENTRY
-trTargetEntry (I.TargetEntry { I.targetexpr=targetexpr
-                            , I.targetresname=targetresname }, resno)
+trTargetEntry (I.TargetEntry { I.targetexpr, I.targetresname }, resno)
   = do
     targetexpr' <- trExpr targetexpr
 
@@ -192,13 +189,14 @@ trExpr c@(I.CONST {})
       [] -> error $ "No const to infere found: " ++ PP.ppShow c
       x:_ -> return $ snd x
 
-trExpr (I.VAR { I.varTable = varTable
-              , I.varColumn = varColumn })
+trExpr (I.VAR { I.varTable, I.varColumn })
   = do
     rtables <- getRTables ()
     let [rtable] = filter (\x -> tName x == varTable) rtables
     let [column] = filter (\x -> cAttname x == varColumn) $ tCols rtable
+    -- Calculate the index of the table in rtable of PlannedStmt
     let (Just index) = elemIndex rtable rtables
+    -- Postgres enumerates these indizes from 1, so we have to increment the value
     let index' = fromIntegral index + 1
     return $ O.VAR
               { O.varno       = index'
@@ -210,6 +208,41 @@ trExpr (I.VAR { I.varTable = varTable
               , O.varnoold    = index'
               , O.varoattno   = cAttnum column
               , O.location    = -1
+              }
+
+trExpr n@(I.FUNCEXPR { I.funcname, I.funcargs })
+  = do
+    -- Try to find function in pg_proc by name
+    procrow <- getRTableRow (pg_proc, findRow "proname" funcname)
+    -- Error if the function does not exist
+    when (null procrow) $ error $ "FUNCEXPR: function " ++ funcname ++ " not found."
+    -- Extract all information we need
+    let prooid      = fromSql $ head procrow M.! "oid"
+    let prorettype  = fromSql $ head procrow M.! "prorettype"
+    let proretset   = fromSql $ head procrow M.! "proretset"
+    let provariadic = fromSql $ head procrow M.! "provariadic"
+    let pronargs    = fromSql $ head procrow M.! "pronargs"
+
+    -- Check if argument count is correct. Error if mismatch
+    when (pronargs /= length funcargs)
+      $ error $ "FUNCEXPR error: expected "
+                ++ show pronargs 
+                ++ " arguments but got "
+                ++ show (length funcargs)
+                ++ "\n" ++ PP.ppShow n
+
+    funcargs' <- mapM trExpr funcargs
+
+    return $ O.FUNCEXPR
+              { O.funcid = prooid
+              , O.funcresulttype = prorettype
+              , O.funcretset = O.PgBool proretset
+              , O.funcvariadic = O.PgBool provariadic
+              , O.funcformat = 0   -- relevant?
+              , O.funccollid = 0   -- ignore collations
+              , O.inputcollid = 0  -- ignore collations
+              , O.args = O.List funcargs'
+              , O.location = -1
               }
 
 --------------------------------------------------------------------------------
