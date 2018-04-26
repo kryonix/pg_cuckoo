@@ -15,6 +15,10 @@ import qualified Data.Map as M
 import Data.List
 
 import GetTable as Tbl
+import Data.Convertible.Base
+import qualified Database.HDBC as DB
+import qualified Text.Read as TR
+import           Data.Maybe
 
 import qualified InAST as I
 import qualified PgPlan as O
@@ -231,7 +235,36 @@ trExpr n@(I.FUNCEXPR { I.funcname, I.funcargs })
                 ++ show (length funcargs)
                 ++ "\n" ++ PP.ppShow n
 
+    -- Query argument types for type check
+    let proallargtypesDB = DB.safeFromSql $ head procrow M.! "proallargtypes" :: ConvertResult String
+    let proallargtypes = case proallargtypesDB of
+                            -- Second chance if conversion of proallargtypes fails.
+                            Left x -> fromSql $ head procrow M.! "proargtypes"
+                            Right x -> x
+
+    let proallargtypes' = map TR.readMaybe $ words proallargtypes :: [Maybe Integer]
+    unless (all isJust proallargtypes') $ error $ "getProcData error while reading proallargtypes: " ++ show procrow
+    let proallargtypesSplit = catMaybes proallargtypes'
+
     funcargs' <- mapM trExpr funcargs
+
+    -- Type check
+    let argTypes = map getExprType funcargs'
+
+    -- Check which (if any) argument types do not match.
+    -- Used for helpful error message
+    let errPositions = [ (c, b, a)
+                       | (a, b, c) <- zip3 argTypes proallargtypesSplit [1..]
+                       , a /= b ]
+
+    -- Types do not match, print error and abort
+    unless (proallargtypesSplit == argTypes)
+      $ error $ "FUNCEXPR error: type of arguments don't match function definition"
+                ++ "\n"
+                ++ concat [ "Argument " ++ show a ++ ": expected type " ++ show b ++ " but got " ++ show c ++ "\n"
+                   | (a, b, c) <- errPositions
+                   ]
+                ++ PP.ppShow n
 
     return $ O.FUNCEXPR
               { O.funcid = prooid
@@ -244,6 +277,16 @@ trExpr n@(I.FUNCEXPR { I.funcname, I.funcargs })
               , O.args = O.List funcargs'
               , O.location = -1
               }
+
+--------------------------------------------------------------------------------
+--
+
+getExprType :: O.Expr -> Integer
+getExprType (O.VAR { O.vartype }) = vartype
+getExprType (O.CONST { O.consttype }) = consttype
+getExprType (O.FUNCEXPR { O.funcresulttype }) = funcresulttype
+
+getExprType x = error $ "getType not implemented for: " ++ PP.ppShow x
 
 --------------------------------------------------------------------------------
 -- Datatypes and functions to access pg catalog information
