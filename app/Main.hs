@@ -19,6 +19,7 @@ import Inference as I
 import Extract as E
 
 import GPrint
+import Data.List
 
 const1 :: A.Operator
 const1 = A.RESULT
@@ -170,7 +171,7 @@ func2 = A.RESULT
                       { A.oprname="<"
                       , A.oprargs=
                           [ A.CONST "1" "int4"
-                          , A.CONST "fail" "text"
+                          , A.CONST "42" "int4"
                           ]
                       }
                 , A.targetresname = "lessThan"
@@ -191,9 +192,11 @@ checkAndGenerate authStr op = do
   putStrLn $ "Validate: "
   let errs = V.validateOperator op
   -- Print errors
-  putStrLn $ PP.ppShow errs
+  -- putStrLn $ intercalate "\n" errs
 
-  unless (null errs) $ error $ "AST could not be validated:\n" ++ PP.ppShow errs
+  unless (null errs) $
+    do
+      error $ "AST is invalid:\n" ++ intercalate "\n" errs
 
   -- Get Catalog data
   tableDataR <- getTableData authStr

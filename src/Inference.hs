@@ -283,7 +283,7 @@ trExpr n@(I.OPEXPR { I.oprname, I.oprargs })
     args' <- mapM trExpr oprargs
     let argTypes = map getExprType args'
     let (oprleft, oprright) = case argTypes of
-                              [r] -> (0, r)
+                              [r]    -> (0, r)
                               [l, r] -> (l, r)
                               err    -> error $ "OPEXPR error: invalid number of arguments"
     -- Get tables from context, we have to do it that way instead of via
@@ -295,11 +295,13 @@ trExpr n@(I.OPEXPR { I.oprname, I.oprargs })
                          && x M.! "oprleft" == (DB.toSql oprleft)
                          && x M.! "oprright" == (DB.toSql oprright)) table
 
-    when (null row) $ error $ "OPEXPR error: operator '"
-                            ++ oprname
-                            ++ "' for given arguments does not exist!"
-                            ++ " Check types of arguments."
-                            ++ "\n" ++ PP.ppShow n
+    -- No operator matching the argument types or operator name exists.
+    when (null row)
+      $ error $ "OPEXPR error: operator '"
+                ++ oprname
+                ++ "' for given arguments does not exist!"
+                ++ " Check types of arguments."
+                ++ "\n" ++ PP.ppShow n
     
     let oprcode = fromSql $ head row M.! "oprcode"
     -- Try to find function in pg_proc by name
@@ -333,7 +335,7 @@ getExprType (O.CONST { O.consttype }) = consttype
 getExprType (O.FUNCEXPR { O.funcresulttype }) = funcresulttype
 getExprType (O.OPEXPR { O.opresulttype }) = opresulttype
 
-getExprType x = error $ "getType not implemented for: " ++ PP.ppShow x
+getExprType x = error $ "getExprType not implemented for: " ++ PP.ppShow x
 
 --------------------------------------------------------------------------------
 -- Datatypes and functions to access pg catalog information

@@ -17,6 +17,8 @@ module Validate ( validateOperator
 import OperSem
 import InAST as I
 
+import qualified Text.Show.Pretty as PP
+
 data Log = Log { errors :: [ String ] }
 
 instance Monoid Log where
@@ -94,7 +96,13 @@ validateExpr op = let
     when (null funcname) $ logError $ "FUNCEXPR error: funcname is empty"
     mapM_ (~~>) funcargs
 
-(~~>) (OPEXPR { oprname, oprargs })
+(~~>) o@(OPEXPR { oprname, oprargs })
   = do
     when (null oprname) $ logError $ "OPEXPR error: oprname is empty"
+    when (null oprargs) $ logError $ "OPEXPR error: no arguments found"
+                                    ++ "\n" ++ PP.ppShow o
+    when (length oprargs > 2) 
+      $ logError $ "OPEXPR error: expected one or two arguments but got " 
+                  ++ show (length oprargs)
+                  ++ "\n" ++ PP.ppShow o
     mapM_ (~~>) oprargs
