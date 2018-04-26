@@ -44,4 +44,8 @@ data Expr = VAR
             { funcname :: String
             , funcargs :: [Expr]
             }
+          | OPEXPR
+            { oprname :: String
+            , oprargs :: [Expr]
+            }
     deriving (Eq, Show)

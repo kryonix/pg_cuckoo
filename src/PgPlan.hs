@@ -337,6 +337,16 @@ data Expr = VAR
             , args           :: List Expr  -- ^ arguments to the function
             , location       :: Integer
             }
+          | OPEXPR
+            { opno         :: Integer    -- ^ PG_OPERATOR OID of the operator
+            , opfuncid     :: Integer    -- ^ PG_PROC OID of underlying function
+            , opresulttype :: Integer    -- ^ PG_TYPE OID of result value
+            , opretset     :: PgBool     -- ^ true if operator returns set
+            , opcollid     :: Integer    -- ^ OID of collation of result
+            , inputcollid  :: Integer    -- ^ OID of collation that operator should use
+            , args         :: List Expr  -- ^ arguments to the operator (1 or 2)
+            , location     :: Integer    -- ^ token location, or -1 if unknown
+            }
     deriving (Eq, Show, Generic, GPrint)
 
 -- / Complex data types

@@ -93,3 +93,8 @@ validateExpr op = let
   = do
     when (null funcname) $ logError $ "FUNCEXPR error: funcname is empty"
     mapM_ (~~>) funcargs
+
+(~~>) (OPEXPR { oprname, oprargs })
+  = do
+    when (null oprname) $ logError $ "OPEXPR error: oprname is empty"
+    mapM_ (~~>) oprargs

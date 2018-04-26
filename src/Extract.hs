@@ -75,7 +75,10 @@ extract op = let
                })
   = logConst c
 
-(~~>) (FUNCEXPR { funcname, funcargs })
+(~~>) (FUNCEXPR { funcargs })
   = mapM_ (~~>) funcargs
+
+(~~>) (OPEXPR { oprargs })
+  = mapM_ (~~>) oprargs
 
 (~~>) e = return ()

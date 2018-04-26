@@ -161,6 +161,24 @@ seq5 = A.SEQSCAN
         , A.scanrelation="grp"
         }
 
+func2 :: A.Operator
+func2 = A.RESULT
+          { A.targetlist =
+              [ A.TargetEntry
+                { A.targetexpr = 
+                    A.OPEXPR
+                      { A.oprname="<"
+                      , A.oprargs=
+                          [ A.CONST "1" "int4"
+                          , A.CONST "fail" "text"
+                          ]
+                      }
+                , A.targetresname = "lessThan"
+                }
+              ]
+          , A.resconstantqual = Nothing
+          }
+
 -- access list elements safely
 (!!) :: [a] -> Int -> Maybe a
 (!!) lst idx = if idx >= length lst
@@ -208,4 +226,4 @@ main = do
     let cp = forceEither config
     let authStr = forceEither $ get cp "Main" "dbauth" :: String
 
-    checkAndGenerate authStr seq5
+    checkAndGenerate authStr func2

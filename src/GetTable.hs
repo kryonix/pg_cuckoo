@@ -52,7 +52,7 @@ tableToMap rows = map rowToMap rows
 -- | Fetch tables from DB
 getTableData :: String -> IO TableData
 getTableData auth = do
-    pg_operators <- getTable auth "SELECT oid, oprname, oprleft, oprright, oprresult FROM pg_operator"
+    pg_operators <- getTable auth "SELECT oid, oprname, oprleft, oprright, oprresult, oprcode FROM pg_operator"
     pg_type      <- getTable auth "SELECT oid, typname, typcategory, typelem, typrelid FROM pg_type"
     pg_proc      <- getTable auth "SELECT oid, proname, proargtypes, prorettype, proretset, array_to_string(proallargtypes , ' ') as proallargtypes, array_to_string(proargmodes, ' ') as proargmodes, array_to_string(proargnames, ' ') as proargnames, provariadic=0 as provariadic, pronargs FROM pg_proc"
     pg_class     <- getTable auth "SELECT oid, relname, relkind FROM pg_class"

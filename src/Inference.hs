@@ -190,7 +190,7 @@ trExpr c@(I.CONST {})
     exprs <- getExprList ()
     let matches = filter (\x -> c == fst x) exprs
     case matches of
-      [] -> error $ "No const to infere found: " ++ PP.ppShow c
+      [] -> error $ "No const to infer found: " ++ PP.ppShow c
       x:_ -> return $ snd x
 
 trExpr (I.VAR { I.varTable, I.varColumn })
@@ -278,6 +278,52 @@ trExpr n@(I.FUNCEXPR { I.funcname, I.funcargs })
               , O.location = -1
               }
 
+trExpr n@(I.OPEXPR { I.oprname, I.oprargs })
+  = do
+    args' <- mapM trExpr oprargs
+    let argTypes = map getExprType args'
+    let (oprleft, oprright) = case argTypes of
+                              [r] -> (0, r)
+                              [l, r] -> (l, r)
+                              err    -> error $ "OPEXPR error: invalid number of arguments"
+    -- Get tables from context, we have to do it that way instead of via
+    -- findRow, because we need to perform a search using multiple qualifications.
+    td <- getRTableData ()
+    let table = pg_operators td
+    -- Try to find function in pg_operator by name and argument types
+    let row = filter (\x -> x M.! "oprname" == (DB.toSql oprname)
+                         && x M.! "oprleft" == (DB.toSql oprleft)
+                         && x M.! "oprright" == (DB.toSql oprright)) table
+
+    when (null row) $ error $ "OPEXPR error: operator '"
+                            ++ oprname
+                            ++ "' for given arguments does not exist!"
+                            ++ " Check types of arguments."
+                            ++ "\n" ++ PP.ppShow n
+    
+    let oprcode = fromSql $ head row M.! "oprcode"
+    -- Try to find function in pg_proc by name
+    procrow <- getRTableRow (pg_proc, findRow "proname" oprcode)
+    -- Error if the function does not exist (can not happen)
+    when (null procrow) $ error $ "OPEXPR: function " ++ oprcode ++ " not found."
+    -- Extract all information we need
+    let prooid      = fromSql $ head procrow M.! "oid"
+    let prorettype  = fromSql $ head procrow M.! "prorettype"
+    let proretset   = fromSql $ head procrow M.! "proretset"
+
+    let opno      = fromSql $ head row M.! "oid"
+
+    return $ O.OPEXPR
+              { O.opno = opno
+              , O.opfuncid = prooid
+              , O.opresulttype = prorettype
+              , O.opretset = O.PgBool proretset
+              , O.opcollid = 0  -- Ignore collations
+              , O.inputcollid = 0
+              , O.args = O.List args'
+              , O.location = -1
+              }
+
 --------------------------------------------------------------------------------
 --
 
@@ -285,6 +331,7 @@ getExprType :: O.Expr -> Integer
 getExprType (O.VAR { O.vartype }) = vartype
 getExprType (O.CONST { O.consttype }) = consttype
 getExprType (O.FUNCEXPR { O.funcresulttype }) = funcresulttype
+getExprType (O.OPEXPR { O.opresulttype }) = opresulttype
 
 getExprType x = error $ "getType not implemented for: " ++ PP.ppShow x
 
