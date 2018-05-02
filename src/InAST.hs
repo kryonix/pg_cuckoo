@@ -7,6 +7,7 @@ Author      : Denis Hirn
 
 module InAST ( Operator(..)
              , TargetEntry(..)
+             , SortEx(..)
              , Expr(..) ) where
 
 data Operator = SEQSCAN
@@ -23,6 +24,11 @@ data Operator = SEQSCAN
                 , limitOffset :: Maybe Expr
                 , limitCount  :: Maybe Expr
                 }
+              | SORT
+                { targetlist :: [TargetEntry]
+                , operator   :: Operator
+                , sortCols   :: [SortEx]
+                }
     deriving(Eq, Show)
 
 
@@ -30,6 +36,13 @@ data TargetEntry = TargetEntry
                     { targetexpr    :: Expr
                     , targetresname :: String
                     }
+    deriving(Eq, Show)
+
+data SortEx = SortEx
+              { sortTarget     :: Integer
+              , sortASC        :: Bool
+              , sortNullsFirst :: Bool
+              }
     deriving(Eq, Show)
 
 data Expr = VAR

@@ -185,6 +185,69 @@ trOperator n@(I.LIMIT { I.operator, I.limitOffset, I.limitCount })
     return $ O.LIMIT (O.defaultPlan { O.targetlist=O.targetlist (O.genericPlan operator')
                                     , O.lefttree=Just operator' }) limitOffset' limitCount'
 
+trOperator n@(I.SORT { I.targetlist, I.operator, I.sortCols })
+  = do
+    targetlist' <- mapM trTargetEntry $ zip targetlist [1..]
+    operator'   <- trOperator operator
+
+    let numCols = length sortCols
+
+    when (length targetlist' < numCols)
+      $ error $ "SORT: more sortCols than targetlist entries defined."
+
+    let targetlistM = M.fromList $ zip [0..] targetlist'
+
+    let targetlist'' = [ (idx, (\ t -> t {O.ressortgroupref=idx+1}) $ targetlistM M.! idx)
+                       | I.SortEx {I.sortTarget=idx} <- sortCols
+                       ]
+    let targetlist''' = map snd $ M.toList (M.union (M.fromList targetlist'') targetlistM)
+
+    let collations = O.PlainList $ replicate numCols 0
+    let nullsFirst = O.PlainList $ map (O.PgBool . I.sortNullsFirst) sortCols
+
+    let targetExprs = map (getExprType . O.expr)
+                          $ filter (\(O.TARGETENTRY {O.ressortgroupref=x}) -> x /= 0) targetlist'''
+    let targetDirs  = map I.sortASC sortCols
+
+    opnos <- mapM searchOperator $ zip targetExprs targetDirs
+
+    when (null opnos) $ error "no opnos found"
+
+    let sortOperators = O.PlainList opnos
+    let sortColIdx    = O.PlainList $ map ((+1) . I.sortTarget) sortCols
+
+    return $ O.SORT
+              { O.genericPlan = (O.defaultPlan { O.targetlist=O.List targetlist'''
+                                               , O.lefttree= Just operator'})
+              , O.numCols = fromIntegral numCols
+              , O.sortColIdx = sortColIdx
+              , O.sortOperators = sortOperators
+              , O.collations = collations
+              , O.nullsFirst = nullsFirst
+              }
+
+
+searchOperator :: Rule (Integer, Bool) Integer
+searchOperator (typ, asc)
+  = do
+    -- Get tables from context, we have to do it that way instead of via
+    -- findRow, because we need to perform a search using multiple qualifications.
+    td <- getRTableData ()
+    let table = pg_operators td
+    
+    -- Try to find function in pg_operator by name and argument types
+    let row = filter (\x -> x M.! "oprname" == (DB.toSql (if asc then "<" else ">"))
+                         && x M.! "oprleft" == (DB.toSql typ)
+                         && x M.! "oprright" == (DB.toSql typ)) table
+
+    -- No operator matching the argument types or operator name exists.
+    when (null row)
+      $ error $ "searchOperator: no operator found"
+
+    let opno      = fromSql $ head row M.! "oid"
+    return opno
+
+
 trTargetEntry :: Rule (I.TargetEntry, Integer) O.TARGETENTRY
 trTargetEntry (I.TargetEntry { I.targetexpr, I.targetresname }, resno)
   = do

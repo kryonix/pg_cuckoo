@@ -72,6 +72,11 @@ validateExpr op = let
     mapM_ (~~>) limitOffset
     mapM_ (~~>) limitCount
 
+(~>) (SORT {targetlist, operator})
+  = do
+    mapM_ (~~~>) targetlist
+    (~>) operator
+
 -- | TargetEntry validator
 (~~~>) :: Rule I.TargetEntry ()
 (~~~>) (TargetEntry { targetexpr, targetresname })

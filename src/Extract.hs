@@ -60,13 +60,14 @@ extract op = let
     mapM_ (~~>) limitOffset
     mapM_ (~~>) limitCount
 
--- | TargetEntry validator
-(~~~>) :: Rule I.TargetEntry ()
-(~~~>) (TargetEntry { targetexpr=targetexpr
-                    , targetresname=targetresname
-                    })
+(~>) (SORT {targetlist, operator})
   = do
-    (~~>) targetexpr
+    mapM_ (~~~>) targetlist
+    (~>) operator
+
+-- | TargetEntry extract
+(~~~>) :: Rule I.TargetEntry ()
+(~~~>) (I.TargetEntry { targetexpr }) = (~~>) targetexpr
 
 -- | Expression validator
 (~~>) :: Rule I.Expr ()

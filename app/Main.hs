@@ -180,6 +180,36 @@ func2 = A.RESULT
           , A.resconstantqual = Nothing
           }
 
+sort1 :: A.Operator
+sort1 = A.SORT
+        { A.targetlist =
+            [ A.TargetEntry
+                { A.targetexpr = A.VAR {A.varTable="grp", A.varColumn="a"}
+                , A.targetresname = "foo"
+                }
+            , A.TargetEntry 
+                { A.targetexpr = A.VAR {A.varTable="grp", A.varColumn="b"}
+                , A.targetresname = "bar"
+                }
+            ]
+        , A.operator =
+            A.SEQSCAN
+            { A.targetlist =
+                [ A.TargetEntry
+                    { A.targetexpr = A.VAR {A.varTable="grp", A.varColumn="a"}
+                    , A.targetresname = "foo"
+                    }
+                , A.TargetEntry 
+                    { A.targetexpr = A.VAR {A.varTable="grp", A.varColumn="b"}
+                    , A.targetresname = "bar"
+                    }
+                ]
+            , A.qual = []
+            , A.scanrelation="grp"
+            }
+        , A.sortCols = [ A.SortEx 0 False True ]
+        }
+
 -- access list elements safely
 (!!) :: [a] -> Int -> Maybe a
 (!!) lst idx = if idx >= length lst
@@ -229,4 +259,4 @@ main = do
     let cp = forceEither config
     let authStr = forceEither $ get cp "Main" "dbauth" :: String
 
-    checkAndGenerate authStr func2
+    checkAndGenerate authStr sort1

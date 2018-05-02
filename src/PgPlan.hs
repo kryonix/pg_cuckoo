@@ -28,6 +28,7 @@ module PgPlan ( Null(..)
               , RelationList(..)
               , Bitmapset(..)
               , Alias(..)
+              , PlainList(..)
               , RangeEx(..)
               , List(..)
               , PgBool(..)
@@ -241,6 +242,14 @@ data Plan = RESULT
             { genericPlan :: GenericPlan
             , limitOffset :: Maybe Expr  -- OFFSET parameter, or NULL if none 
             , limitCount  :: Maybe Expr  -- COUNT parameter, or NULL if none
+            }
+          | SORT
+            { genericPlan   :: GenericPlan
+            , numCols       :: Integer
+            , sortColIdx    :: PlainList Integer
+            , sortOperators :: PlainList Integer
+            , collations    :: PlainList Integer
+            , nullsFirst    :: PlainList PgBool
             }
     deriving (Eq, Show, Generic, GPrint)
 
