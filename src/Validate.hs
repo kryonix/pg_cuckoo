@@ -77,6 +77,13 @@ validateExpr op = let
     mapM_ (~~~>) targetlist
     (~>) operator
 
+(~>) (APPEND {targetlist, appendplans})
+  = do
+    mapM_ (~~~>) targetlist
+    when (null appendplans)
+      $ logError $ "APPEND: no appendplans specified"
+    mapM_ (~>) appendplans
+
 -- | TargetEntry validator
 (~~~>) :: Rule I.TargetEntry ()
 (~~~>) (TargetEntry { targetexpr, targetresname })

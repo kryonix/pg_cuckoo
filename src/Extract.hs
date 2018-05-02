@@ -65,6 +65,11 @@ extract op = let
     mapM_ (~~~>) targetlist
     (~>) operator
 
+(~>) (APPEND {targetlist, appendplans})
+  = do
+    mapM_ (~~~>) targetlist
+    mapM_ (~>) appendplans
+
 -- | TargetEntry extract
 (~~~>) :: Rule I.TargetEntry ()
 (~~~>) (I.TargetEntry { targetexpr }) = (~~>) targetexpr

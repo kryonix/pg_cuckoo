@@ -29,6 +29,10 @@ data Operator = SEQSCAN
                 , operator   :: Operator
                 , sortCols   :: [SortEx]
                 }
+              | APPEND
+                { targetlist :: [TargetEntry]
+                , appendplans :: [Operator]
+                }
     deriving(Eq, Show)
 
 

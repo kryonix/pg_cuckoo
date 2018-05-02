@@ -251,6 +251,11 @@ data Plan = RESULT
             , collations    :: PlainList Integer
             , nullsFirst    :: PlainList PgBool
             }
+          | APPEND
+            { genericPlan :: GenericPlan
+            , partitioned_rels :: Null
+            , appendplans :: List Plan
+            }
     deriving (Eq, Show, Generic, GPrint)
 
 data RangeEx = RTE

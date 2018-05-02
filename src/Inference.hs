@@ -226,6 +226,43 @@ trOperator n@(I.SORT { I.targetlist, I.operator, I.sortCols })
               , O.nullsFirst = nullsFirst
               }
 
+trOperator (I.APPEND {I.targetlist, I.appendplans})
+  = do
+    context <- lift $ ask
+    appendplans' <- mapM trOperator appendplans
+
+    -- OUTER_PLAN = first of appendplans
+    -- Generate a fake table with fake columns.
+    -- We need this to perform inference of VAR, referencing
+    -- sub-operators.
+    let (O.List fstPlanTargets) = (O.targetlist $ O.genericPlan (head appendplans'))
+
+    let fakeCols =  [ PgColumn
+                      { cAttname      = maybe "" id resname
+                      , cAtttypid     = getExprType expr
+                      , cAttlen       = 0
+                      , cAttnum       = num
+                      , cAtttypmod    = -1
+                      , cAttcollation = 0
+                      }
+                    |
+                      (O.TARGETENTRY { O.expr=expr, O.resname }, num) <- zip fstPlanTargets [1..]
+                    ]
+
+    let fakeTable = PgTable { tOID  = -1, tName = "OUTER_VAR"
+                            , tKind = "", tCols = fakeCols }
+
+    -- Get rid of existing fake-tables (maybe not required?)
+    let rtablesC = dropWhile (\(PgTable {tOID}) -> tOID == -1) $ rtables context
+    let context' = context {rtables=fakeTable:rtablesC}
+
+    targetlist' <- local (const context') $ mapM trTargetEntry $ zip targetlist [1..]
+
+    return $ O.APPEND
+              { O.genericPlan = (O.defaultPlan { O.targetlist = O.List targetlist' })
+              , O.partitioned_rels = O.Null
+              , O.appendplans = O.List appendplans'
+              }
 
 searchOperator :: Rule (Integer, Bool) Integer
 searchOperator (typ, asc)
@@ -273,6 +310,10 @@ trExpr c@(I.CONST {})
       [] -> error $ "No const to infer found: " ++ PP.ppShow c
       x:_ -> return $ snd x
 
+
+-- INNER_VAR ref: 65000
+-- OUTER_VAR ref: 65001
+-- INDEX_VAR ref: 65002
 trExpr (I.VAR { I.varTable, I.varColumn })
   = do
     rtables <- getRTables ()
@@ -281,7 +322,10 @@ trExpr (I.VAR { I.varTable, I.varColumn })
     -- Calculate the index of the table in rtable of PlannedStmt
     let (Just index) = elemIndex rtable rtables
     -- Postgres enumerates these indizes from 1, so we have to increment the value
-    let index' = fromIntegral index + 1
+    let index' = case varTable of
+                  "OUTER_VAR" -> 65001
+                  _ -> fromIntegral index + 1
+
     return $ O.VAR
               { O.varno       = index'
               , O.varattno    = cAttnum column

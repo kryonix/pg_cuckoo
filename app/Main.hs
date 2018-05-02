@@ -210,6 +210,16 @@ sort1 = A.SORT
         , A.sortCols = [ A.SortEx 0 False True ]
         }
 
+app1 :: A.Operator
+app1 = A.APPEND
+        { A.targetlist =
+          [ A.TargetEntry
+              { A.targetexpr = A.VAR {A.varTable="OUTER_VAR", A.varColumn="lessThan"}
+              , A.targetresname = "bar" }
+          ]
+        , A.appendplans = [func2, func2]
+        }
+
 -- access list elements safely
 (!!) :: [a] -> Int -> Maybe a
 (!!) lst idx = if idx >= length lst
@@ -259,4 +269,4 @@ main = do
     let cp = forceEither config
     let authStr = forceEither $ get cp "Main" "dbauth" :: String
 
-    checkAndGenerate authStr sort1
+    checkAndGenerate authStr app1
