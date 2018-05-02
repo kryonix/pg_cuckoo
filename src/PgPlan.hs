@@ -58,6 +58,10 @@ data RelationList = RelationList [Integer]
 data Bitmapset = Bitmapset [Integer]
     deriving (Eq, Show)
 
+-- | The same as List but gprint without parens
+data PlainList a = PlainList [a]
+    deriving(Eq, Show)
+
 data Seq = Seq 
             { seqlength :: Integer
             , seqvalues :: [Integer] }
@@ -85,6 +89,10 @@ data Test = Test {foo :: Integer, baz :: Double}
 instance (GPrint a) => GPrint (List a) where
   gprint (List []) = "<>"
   gprint (List xs) = "(" ++ (intercalate " " $ map gprint xs) ++ ")"
+
+instance (GPrint a) => GPrint (PlainList a) where
+  gprint (PlainList []) = "<>"
+  gprint (PlainList xs) = (intercalate " " $ map gprint xs)
 
 instance GPrint Bitmapset where
   gprint (Bitmapset []) = "(b)"

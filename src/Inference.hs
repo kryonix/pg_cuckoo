@@ -141,16 +141,25 @@ pgTableToRTE t = O.RTE
 
 
 trOperator :: Rule I.Operator O.Plan
-trOperator (I.RESULT { I.targetlist=targetlist, I.resconstantqual})
+trOperator n@(I.RESULT { I.targetlist=targetlist, I.resconstantqual})
   = do
     targetlist' <- mapM trTargetEntry $ zip targetlist [1..]
     qual'       <- mapM trExpr resconstantqual
+
+    when (isJust qual' && getExprType (fromJust qual') /= 16)
+      $ error $ "Type error: resconstantqual is not a boolean"
+              ++ "\n" ++ PP.ppShow n
+
     return $ O.RESULT (O.defaultPlan {O.targetlist=O.List targetlist'}) qual'
 
-trOperator (I.SEQSCAN { I.targetlist, I.qual, I.scanrelation })
+trOperator n@(I.SEQSCAN { I.targetlist, I.qual, I.scanrelation })
   = do
     targetlist' <- mapM trTargetEntry $ zip targetlist [1..]
     qual'       <- mapM trExpr qual
+
+    when (any (\x -> getExprType x /= 16) qual')
+      $ error $ "Type error: qual is not a boolean"
+              ++ "\n" ++ PP.ppShow n
 
     rtables <- getRTables ()
     let [rtable] = filter (\x -> tName x == scanrelation) rtables
@@ -159,11 +168,19 @@ trOperator (I.SEQSCAN { I.targetlist, I.qual, I.scanrelation })
     return $ O.SEQSCAN (O.defaultPlan { O.targetlist=O.List targetlist'
                                       , O.qual=O.List qual'}) index'
 
-trOperator (I.LIMIT { I.operator, I.limitOffset, I.limitCount })
+trOperator n@(I.LIMIT { I.operator, I.limitOffset, I.limitCount })
   = do
     operator'    <- trOperator operator
     limitOffset' <- mapM trExpr limitOffset
     limitCount'  <- mapM trExpr limitCount
+
+    when (isJust limitOffset' && getExprType (fromJust limitOffset') /= 20)
+      $ error $ "Type error: limitOffset is not an int8"
+              ++ "\n" ++ PP.ppShow n
+
+    when (isJust limitCount' && getExprType (fromJust limitCount') /= 20)
+      $ error $ "Type error: limitCount is not an int8"
+              ++ "\n" ++ PP.ppShow n
 
     return $ O.LIMIT (O.defaultPlan { O.targetlist=O.targetlist (O.genericPlan operator')
                                     , O.lefttree=Just operator' }) limitOffset' limitCount'
