@@ -65,6 +65,11 @@ extract op = let
     mapM_ (~~~>) targetlist
     (~>) operator
 
+(~>) (AGG {targetlist, operator})
+  = do
+    mapM_ (~~~>) targetlist
+    (~>) operator
+
 (~>) (APPEND {targetlist, appendplans})
   = do
     mapM_ (~~~>) targetlist
@@ -86,5 +91,11 @@ extract op = let
 
 (~~>) (OPEXPR { oprargs })
   = mapM_ (~~>) oprargs
+
+(~~>) (AGGREF { aggargs, aggdirectargs, aggfilter })
+  = do
+    mapM_ (~~~>) aggargs
+    mapM_ (~~>) aggdirectargs
+    mapM_ (~~>) aggfilter
 
 (~~>) e = return ()

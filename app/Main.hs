@@ -27,6 +27,7 @@ const1 = A.RESULT
               [ A.TargetEntry
                 { A.targetexpr = A.CONST "42" "int4"
                 , A.targetresname = "valid"
+                , A.resjunk = False
                 }
               ]
           , A.resconstantqual = Nothing
@@ -39,10 +40,12 @@ seq1 = A.SEQSCAN
             [ A.TargetEntry
                 { A.targetexpr = A.VAR {A.varTable="grp", A.varColumn="a"}
                 , A.targetresname = "foo"
+                , A.resjunk = False
                 }
             , A.TargetEntry 
                 { A.targetexpr = A.VAR {A.varTable="grp", A.varColumn="b"}
                 , A.targetresname = "bar"
+                , A.resjunk = False
                 }
             ]
         , A.qual = []
@@ -69,6 +72,7 @@ func1 = A.RESULT
                           ]
                       }
                 , A.targetresname = "addition"
+                , A.resjunk = False
                 }
               ]
           , A.resconstantqual = Nothing
@@ -80,10 +84,12 @@ seq3 = A.SEQSCAN
             [ A.TargetEntry
                 { A.targetexpr = A.VAR {A.varTable="grp", A.varColumn="a"}
                 , A.targetresname = "foo"
+                , A.resjunk = False
                 }
             , A.TargetEntry 
                 { A.targetexpr = A.VAR {A.varTable="grp", A.varColumn="b"}
                 , A.targetresname = "bar"
+                , A.resjunk = False
                 }
             , A.TargetEntry
                 { A.targetexpr =
@@ -95,6 +101,7 @@ seq3 = A.SEQSCAN
                           ] 
                       }
                 , A.targetresname = "baz"
+                , A.resjunk = False
                 }
             ]
         , A.qual = []
@@ -107,10 +114,12 @@ seq4 = A.SEQSCAN
             [ A.TargetEntry
                 { A.targetexpr = A.VAR {A.varTable="grp", A.varColumn="a"}
                 , A.targetresname = "foo"
+                , A.resjunk = False
                 }
             , A.TargetEntry 
                 { A.targetexpr = A.VAR {A.varTable="grp", A.varColumn="b"}
                 , A.targetresname = "bar"
+                , A.resjunk = False
                 }
             , A.TargetEntry
                 { A.targetexpr =
@@ -132,6 +141,7 @@ seq4 = A.SEQSCAN
                           ]
                       }
                 , A.targetresname = "baz"
+                , A.resjunk = False
                 }
             ]
         , A.qual = []
@@ -144,10 +154,12 @@ seq5 = A.SEQSCAN
             [ A.TargetEntry
                 { A.targetexpr = A.VAR {A.varTable="grp", A.varColumn="a"}
                 , A.targetresname = "foo"
+                , A.resjunk = False
                 }
             , A.TargetEntry 
                 { A.targetexpr = A.VAR {A.varTable="grp", A.varColumn="b"}
                 , A.targetresname = "bar"
+                , A.resjunk = False
                 }
             ]
         , A.qual =
@@ -175,6 +187,7 @@ func2 = A.RESULT
                           ]
                       }
                 , A.targetresname = "lessThan"
+                , A.resjunk = False
                 }
               ]
           , A.resconstantqual = Nothing
@@ -186,10 +199,12 @@ sort1 = A.SORT
             [ A.TargetEntry
                 { A.targetexpr = A.VAR {A.varTable="grp", A.varColumn="a"}
                 , A.targetresname = "foo"
+                , A.resjunk = False
                 }
             , A.TargetEntry 
                 { A.targetexpr = A.VAR {A.varTable="grp", A.varColumn="b"}
                 , A.targetresname = "bar"
+                , A.resjunk = False
                 }
             ]
         , A.operator =
@@ -198,16 +213,18 @@ sort1 = A.SORT
                 [ A.TargetEntry
                     { A.targetexpr = A.VAR {A.varTable="grp", A.varColumn="a"}
                     , A.targetresname = "foo"
+                    , A.resjunk = False
                     }
                 , A.TargetEntry 
                     { A.targetexpr = A.VAR {A.varTable="grp", A.varColumn="b"}
                     , A.targetresname = "bar"
+                    , A.resjunk = False
                     }
                 ]
             , A.qual = []
             , A.scanrelation="grp"
             }
-        , A.sortCols = [ A.SortEx 0 False True ]
+        , A.sortCols = [ A.SortEx 1 False True ]
         }
 
 app1 :: A.Operator
@@ -215,9 +232,90 @@ app1 = A.APPEND
         { A.targetlist =
           [ A.TargetEntry
               { A.targetexpr = A.VAR {A.varTable="OUTER_VAR", A.varColumn="lessThan"}
-              , A.targetresname = "bar" }
+              , A.targetresname = "bar"
+              , A.resjunk = False
+              }
           ]
         , A.appendplans = [func2, func2]
+        }
+
+agg1 :: A.Operator
+agg1 = A.AGG
+        { A.targetlist =
+            [ A.TargetEntry
+                { A.targetexpr =
+                    A.AGGREF
+                      { A.aggname = "sum"
+                      , A.aggargs = [ A.TargetEntry
+                                        { A.targetexpr = A.CONST "1" "int4"
+                                        , A.targetresname = "foo"
+                                        , A.resjunk = False
+                                        }
+                                    ]
+                      , A.aggdirectargs = []
+                      , A.aggorder = []
+                      , A.aggdistinct = []
+                      , A.aggfilter = Nothing
+                      , A.aggstar = False
+                      }
+                , A.targetresname = "foo"
+                , A.resjunk = False
+                }
+            ]
+        , A.operator =
+            A.RESULT
+              { A.targetlist = []
+              , A.resconstantqual = Nothing
+              }
+        , A.groupCols = []
+        }
+
+agg2 :: A.Operator
+agg2 = A.AGG
+        { A.targetlist =
+            [ A.TargetEntry
+                { A.targetexpr =
+                    A.AGGREF
+                      { A.aggname = "sum"
+                      , A.aggargs = [ A.TargetEntry
+                                        { A.targetexpr = A.VAR "OUTER_VAR" "a"
+                                        , A.targetresname = "foo"
+                                        , A.resjunk = False
+                                        }
+                                    ]
+                      , A.aggdirectargs = []
+                      , A.aggorder = []
+                      , A.aggdistinct = []
+                      , A.aggfilter = Nothing
+                      , A.aggstar = False
+                      }
+                , A.targetresname = "foo"
+                , A.resjunk = False
+                }
+            , A.TargetEntry
+                { A.targetexpr = A.VAR "OUTER_VAR" "b"
+                , A.targetresname = "b"
+                , A.resjunk = False
+                }
+            ]
+        , A.operator =
+            A.SEQSCAN
+              { A.targetlist =
+                  [ A.TargetEntry
+                      { A.targetexpr = A.VAR "grp" "a"
+                      , A.targetresname = "a"
+                      , A.resjunk = False
+                      }
+                  , A.TargetEntry
+                      { A.targetexpr = A.VAR "grp" "b"
+                      , A.targetresname = "b"
+                      , A.resjunk = False
+                      }
+                  ]
+              , A.qual = []
+              , A.scanrelation = "grp"
+              }
+        , A.groupCols = [2]
         }
 
 -- access list elements safely
@@ -269,4 +367,4 @@ main = do
     let cp = forceEither config
     let authStr = forceEither $ get cp "Main" "dbauth" :: String
 
-    checkAndGenerate authStr app1
+    checkAndGenerate authStr agg2

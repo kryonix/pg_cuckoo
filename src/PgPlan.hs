@@ -32,7 +32,7 @@ module PgPlan ( Null(..)
               , RangeEx(..)
               , List(..)
               , PgBool(..)
-              , Test(..)
+              , SORTGROUPCLAUSE(..)
               ) where
 
 import GPrint
@@ -78,21 +78,12 @@ pgTrue = PgBool True
 --------------------------------------------------------------------------------
 -- GPrint instances for base types
 
-data Test = Test {foo :: Integer, baz :: Double}
-          | Baum { krach :: Integer }
-          | Tee { good :: List Integer }
-          | Bar { bad :: List Test }
-          | Boom { v :: Null }
-          | B2 { bb :: PgBool }
-    deriving (Generic, GPrint)
-
-
 instance (GPrint a) => GPrint (List a) where
   gprint (List []) = "<>"
   gprint (List xs) = "(" ++ (intercalate " " $ map gprint xs) ++ ")"
 
 instance (GPrint a) => GPrint (PlainList a) where
-  gprint (PlainList []) = "<>"
+  gprint (PlainList []) = "" -- "<>"
   gprint (PlainList xs) = (intercalate " " $ map gprint xs)
 
 instance GPrint Bitmapset where
@@ -256,6 +247,18 @@ data Plan = RESULT
             , partitioned_rels :: Null
             , appendplans :: List Plan
             }
+          | AGG
+            { genericPlan  :: GenericPlan
+            , aggstrategy  :: Integer           -- ^ basic strategy 0: AGG_PLAN, 1: AGG_SORTED, 2: AGG_HASHED, 3: AGG_MIXED
+            , aggsplit     :: Integer           -- ^ agg-splitting mode
+            , numCols      :: Integer           -- ^ number of grouping columns
+            , grpColIdx    :: PlainList Integer -- ^ their indexes in the target list
+            , grpOperators :: PlainList Integer -- ^ equality operators to compare with
+            , numGroups    :: Integer           -- ^ estimated number of groups in input
+            , aggParams    :: Bitmapset         -- ^ IDs of Params used in Aggref inputs
+            , groupingSets :: Null              -- ^ grouping sets to use
+            , chain        :: Null              -- ^ chained Agg/Sort nodes
+          }
     deriving (Eq, Show, Generic, GPrint)
 
 data RangeEx = RTE
@@ -369,6 +372,34 @@ data Expr = VAR
             , args         :: List Expr  -- ^ arguments to the operator (1 or 2)
             , location     :: Integer    -- ^ token location, or -1 if unknown
             }
+          | AGGREF
+            { aggfnoid      :: Integer              -- ^ pg_proc Oid of the aggregate
+            , aggtype       :: Integer              -- ^ type Oid of result of the aggregate
+            , aggcollid     :: Integer              -- ^ OID of collation of result
+            , inputcollid   :: Integer              -- ^ OID of collation that function should use
+            , aggtranstype  :: Integer              -- ^ type Oid of aggregate's transition value
+            , aggargtypes   :: RelationList         -- ^ type Oids of direct and aggregated args
+            , aggdirectargs :: List Expr            -- ^ direct arguments, if an ordered-set agg
+            , _args         :: List TARGETENTRY     -- ^ aggregated arguments and sort expressions
+            , aggorder      :: List SORTGROUPCLAUSE -- ^ ORDER BY
+            , aggdistinct   :: List SORTGROUPCLAUSE -- ^ DISTINCT
+            , aggfilter     :: Maybe Expr           -- ^ FILTER expression, if any
+            , aggstar       :: PgBool               -- ^ TRUE if argument list was really '*'
+            , aggvariadic   :: PgBool               -- ^ true if variadic arguments have been combined into an array last argument
+            , aggkind       :: String               -- ^ aggregate kind (see pg_aggregate.h)
+            , agglevelsup   :: Integer              -- ^ > 0 if agg belongs to outer query
+            , _aggsplit      :: Integer              -- ^ expected agg-splitting mode of parent agg
+            , location      :: Integer              -- ^ token location, or -1 if unknown
+            }
     deriving (Eq, Show, Generic, GPrint)
+
+data SORTGROUPCLAUSE = SORTGROUPCLAUSE
+                       { tleSortGroupRef :: Integer
+                       , eqop            :: Integer
+                       , sortop          :: Integer
+                       , nulls_first     :: PgBool
+                       , hashable        :: PgBool
+                       }
+    deriving(Eq, Show, Generic, GPrint)
 
 -- / Complex data types

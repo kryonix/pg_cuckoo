@@ -77,7 +77,7 @@ instance (GPrint1 f, Selector s) => GPrint1 (M1 S s f) where
       sel = case selName m of
               "" -> ""
               "genericPlan" -> ""
-              e  -> ":" ++ e ++ " "
+              e  -> ":" ++ dropWhile (== '_') e ++ " "
 
 instance (GPrint1 a, GPrint1 b) => GPrint1 (a :*: b) where
   gprint1 (a :*: b) = gprint1 a ++ " " ++ gprint1 b

@@ -84,6 +84,11 @@ validateExpr op = let
       $ logError $ "APPEND: no appendplans specified"
     mapM_ (~>) appendplans
 
+(~>) (AGG {targetlist, operator})
+  = do
+    mapM_ (~~~>) targetlist
+    (~>) operator
+
 -- | TargetEntry validator
 (~~~>) :: Rule I.TargetEntry ()
 (~~~>) (TargetEntry { targetexpr, targetresname })
@@ -118,3 +123,11 @@ validateExpr op = let
                   ++ show (length oprargs)
                   ++ "\n" ++ PP.ppShow o
     mapM_ (~~>) oprargs
+
+(~~>) o@(AGGREF { aggname, aggargs, aggdirectargs, aggfilter })
+  = do
+    when (null aggname)
+      $ logError $ "AGGREF error: aggname is empty"
+    mapM_ (~~~>) aggargs
+    mapM_ (~~>) aggdirectargs
+    mapM_ (~~>) aggfilter

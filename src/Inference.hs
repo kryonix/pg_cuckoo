@@ -195,29 +195,23 @@ trOperator n@(I.SORT { I.targetlist, I.operator, I.sortCols })
     when (length targetlist' < numCols)
       $ error $ "SORT: more sortCols than targetlist entries defined."
 
-    let targetlistM = M.fromList $ zip [0..] targetlist'
-
-    let targetlist'' = [ (idx, (\ t -> t {O.ressortgroupref=idx+1}) $ targetlistM M.! idx)
-                       | I.SortEx {I.sortTarget=idx} <- sortCols
-                       ]
-    let targetlist''' = map snd $ M.toList (M.union (M.fromList targetlist'') targetlistM)
-
     let collations = O.PlainList $ replicate numCols 0
     let nullsFirst = O.PlainList $ map (O.PgBool . I.sortNullsFirst) sortCols
 
+    let sortTargets = map I.sortTarget sortCols
     let targetExprs = map (getExprType . O.expr)
-                          $ filter (\(O.TARGETENTRY {O.ressortgroupref=x}) -> x /= 0) targetlist'''
-    let targetDirs  = map I.sortASC sortCols
+                          $ filter (\(O.TARGETENTRY {O.ressortgroupref=x}) -> x `elem` sortTargets) targetlist'
+    let targetOps  = map ((\x -> if x then "<" else ">") . I.sortASC) sortCols
 
-    opnos <- mapM searchOperator $ zip targetExprs targetDirs
+    opnos <- mapM searchOperator $ zip targetExprs targetOps
 
     when (null opnos) $ error "no opnos found"
 
     let sortOperators = O.PlainList opnos
-    let sortColIdx    = O.PlainList $ map ((+1) . I.sortTarget) sortCols
+    let sortColIdx    = O.PlainList $ map I.sortTarget sortCols
 
     return $ O.SORT
-              { O.genericPlan = (O.defaultPlan { O.targetlist=O.List targetlist'''
+              { O.genericPlan = (O.defaultPlan { O.targetlist=O.List targetlist'
                                                , O.lefttree= Just operator'})
               , O.numCols = fromIntegral numCols
               , O.sortColIdx = sortColIdx
@@ -264,8 +258,64 @@ trOperator (I.APPEND {I.targetlist, I.appendplans})
               , O.appendplans = O.List appendplans'
               }
 
-searchOperator :: Rule (Integer, Bool) Integer
-searchOperator (typ, asc)
+trOperator (I.AGG {I.targetlist, I.operator, I.groupCols})
+  = do
+    context <- lift $ ask
+    operator' <- trOperator operator
+
+
+    -- OUTER_PLAN = first of appendplans
+    -- Generate a fake table with fake columns.
+    -- We need this to perform inference of VAR, referencing
+    -- sub-operators.
+    let (O.List fstPlanTargets) = (O.targetlist $ O.genericPlan operator')
+
+    let fakeCols =  [ PgColumn
+                      { cAttname      = maybe "" id resname
+                      , cAtttypid     = getExprType expr
+                      , cAttlen       = 0
+                      , cAttnum       = num
+                      , cAtttypmod    = -1
+                      , cAttcollation = 0
+                      }
+                    |
+                      (O.TARGETENTRY { O.expr=expr, O.resname }, num) <- zip fstPlanTargets [1..]
+                    ]
+
+    let fakeTable = PgTable { tOID  = -1, tName = "OUTER_VAR"
+                            , tKind = "", tCols = fakeCols }
+    -- Get rid of existing fake-tables (maybe not required?)
+    let rtablesC = dropWhile (\(PgTable {tOID}) -> tOID == -1) $ rtables context
+    let context' = context {rtables=fakeTable:rtablesC}
+
+    targetlist' <- local (const context') $ mapM trTargetEntry $ zip targetlist [1..]
+
+
+    let grpTargets = map (getExprType . O.expr)
+                          $ filter (\(O.TARGETENTRY {O.ressortgroupref=x}) -> x `elem` groupCols) targetlist'
+
+    -- Try to find function in pg_operator by name and argument types
+    ops <- mapM searchOperator $ zip grpTargets (repeat "=")
+
+
+
+    return $ O.AGG
+              { O.genericPlan  = (O.defaultPlan { O.targetlist= O.List targetlist'
+                                                , O.lefttree = Just operator'})
+              , O.aggstrategy  = if (null groupCols) then 0 else 2
+              , O.aggsplit     = 0
+              , O.numCols      = fromIntegral (length groupCols)
+              , O.grpColIdx    = O.PlainList groupCols
+              , O.grpOperators = O.PlainList ops
+              , O.numGroups    = 1
+              , O.aggParams    = O.Bitmapset []
+              , O.groupingSets = O.Null
+              , O.chain        = O.Null
+            }
+
+
+searchOperator :: Rule (Integer, String) Integer
+searchOperator (typ, op)
   = do
     -- Get tables from context, we have to do it that way instead of via
     -- findRow, because we need to perform a search using multiple qualifications.
@@ -273,7 +323,7 @@ searchOperator (typ, asc)
     let table = pg_operators td
     
     -- Try to find function in pg_operator by name and argument types
-    let row = filter (\x -> x M.! "oprname" == (DB.toSql (if asc then "<" else ">"))
+    let row = filter (\x -> x M.! "oprname" == (DB.toSql op)
                          && x M.! "oprleft" == (DB.toSql typ)
                          && x M.! "oprright" == (DB.toSql typ)) table
 
@@ -286,7 +336,7 @@ searchOperator (typ, asc)
 
 
 trTargetEntry :: Rule (I.TargetEntry, Integer) O.TARGETENTRY
-trTargetEntry (I.TargetEntry { I.targetexpr, I.targetresname }, resno)
+trTargetEntry (I.TargetEntry { I.targetexpr, I.targetresname, I.resjunk }, resno)
   = do
     targetexpr' <- trExpr targetexpr
 
@@ -294,12 +344,11 @@ trTargetEntry (I.TargetEntry { I.targetexpr, I.targetresname }, resno)
               { O.expr            = targetexpr'
               , O.resno           = resno
               , O.resname         = Just targetresname
-              , O.ressortgroupref = 0 -- Constant for now
+              , O.ressortgroupref = resno -- 0 -- Constant for now
               , O.resorigtbl      = 0
               , O.resorigcol      = 0
-              , O.resjunk         = O.PgBool False
+              , O.resjunk         = O.PgBool resjunk
               }
-
 
 trExpr :: Rule I.Expr O.Expr
 trExpr c@(I.CONST {})
@@ -449,6 +498,84 @@ trExpr n@(I.OPEXPR { I.oprname, I.oprargs })
               , O.args = O.List args'
               , O.location = -1
               }
+
+trExpr n@(I.AGGREF {I.aggname, I.aggargs, I.aggdirectargs, I.aggorder, I.aggdistinct, I.aggfilter, I.aggstar})
+  = do
+    -- Compile args first, because we need the types to select the row in pg_proc
+    args' <- mapM trTargetEntry $ zip aggargs [1..]
+    let argTypes = map (getExprType . O.expr) args'
+
+    let proallargtypesDB x = DB.safeFromSql $ x M.! "proallargtypes" :: ConvertResult String
+    let proallargtypes p = case proallargtypesDB p of
+                            -- Second chance if conversion of proallargtypes fails.
+                            Left x -> fromSql $ p M.! "proargtypes"
+                            Right x -> x
+
+    let proallargtypesSplit x = if (all isJust proallargtypes')
+                                  then catMaybes proallargtypes'
+                                  else error $ "getProcData error while reading proallargtypes: " ++ show x
+          where proallargtypes' = (map TR.readMaybe $ words (proallargtypes x) :: [Maybe Integer])
+    -- Get tables from context, we have to do it that way instead of via
+    -- findRow, because we need to perform a search using multiple qualifications.
+    td <- getRTableData ()
+    let table = pg_proc td
+    -- Try to find function in pg_operator by name and argument types
+    let procrow = filter (\x -> x M.! "proname" == (DB.toSql aggname)
+                         && x M.! "pronargs" == (DB.toSql (length args'))
+                         && x M.! "proisagg" == (DB.toSql True)
+                         && proallargtypesSplit x == argTypes) table
+
+    -- Error if the function does not exist
+    when (null procrow) $ error $ "AGGREF: aggregate " ++ aggname ++ " not found."
+    -- Extract all information we need
+    let prooid      = fromSql $ head procrow M.! "oid"
+    let prorettype  = fromSql $ head procrow M.! "prorettype"
+    -- let proretset   = fromSql $ head procrow M.! "proretset"
+    -- let provariadic = fromSql $ head procrow M.! "provariadic"
+    let pronargs    = fromSql $ head procrow M.! "pronargs"
+
+    -- Check if argument count is correct. Error if mismatch
+    when (pronargs /= length aggargs)
+      $ error $ "AGGREF error: expected "
+                ++ show pronargs 
+                ++ " arguments but got "
+                ++ show (length aggargs)
+                ++ "\n" ++ PP.ppShow n
+
+    -- Try to find function in pg_proc by name
+    aggrow <- getRTableRow (pg_aggregate, findRow "oid" prooid)
+
+    when (null aggrow)
+      $ error $ "AGGREF error: aggrow not found: " ++ show prooid
+
+    let aggtranstype = fromSql $ head aggrow M.! "aggtranstype"
+    let aggkind      = fromSql $ head aggrow M.! "aggkind"
+
+    -- Query argument types for type check
+    let aggargtypes = O.RelationList $ proallargtypesSplit (head procrow)
+
+    aggdirectargs' <- mapM trExpr aggdirectargs
+    aggfilter'     <- mapM trExpr aggfilter
+
+    return $ O.AGGREF
+            { O.aggfnoid      = prooid
+            , O.aggtype       = prorettype
+            , O.aggcollid     = 0
+            , O.inputcollid   = 0
+            , O.aggtranstype  = aggtranstype
+            , O.aggargtypes   = aggargtypes
+            , O.aggdirectargs = O.List aggdirectargs'
+            , O._args         = O.List args'
+            , O.aggorder      = O.List [] -- :: List SORTGROUPCLAUSE -- ^ ORDER BY
+            , O.aggdistinct   = O.List [] -- :: List SORTGROUPCLAUSE -- ^ DISTINCT
+            , O.aggfilter     = aggfilter'
+            , O.aggstar       = O.PgBool aggstar
+            , O.aggvariadic   = O.PgBool False
+            , O.aggkind       = aggkind
+            , O.agglevelsup   = 0
+            , O._aggsplit     = 0
+            , O.location      = -1
+            }
 
 --------------------------------------------------------------------------------
 --

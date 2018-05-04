@@ -33,12 +33,18 @@ data Operator = SEQSCAN
                 { targetlist :: [TargetEntry]
                 , appendplans :: [Operator]
                 }
+              | AGG
+                { targetlist  :: [TargetEntry]
+                , operator    :: Operator
+                , groupCols   :: [Integer]
+                }
     deriving(Eq, Show)
 
 
 data TargetEntry = TargetEntry
                     { targetexpr    :: Expr
                     , targetresname :: String
+                    , resjunk       :: Bool
                     }
     deriving(Eq, Show)
 
@@ -64,5 +70,14 @@ data Expr = VAR
           | OPEXPR
             { oprname :: String
             , oprargs :: [Expr]
+            }
+          | AGGREF
+            { aggname       :: String
+            , aggargs       :: [TargetEntry]
+            , aggdirectargs :: [Expr]
+            , aggorder      :: [SortEx]
+            , aggdistinct   :: [SortEx]
+            , aggfilter     :: Maybe Expr
+            , aggstar       :: Bool
             }
     deriving (Eq, Show)
