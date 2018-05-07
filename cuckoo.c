@@ -400,6 +400,7 @@ pq_plan_explain(PG_FUNCTION_ARGS)
     es->verbose = true;
     es->analyze = PG_GETARG_BOOL(1);
     es->summary = es->analyze;
+    es->timing = es->analyze;
     ExplainBeginOutput(es);
     PG_TRY();
     {
