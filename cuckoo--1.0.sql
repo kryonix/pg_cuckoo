@@ -15,7 +15,7 @@ RETURNS setof record
 AS '$libdir/cuckoo','pq_plan_deserialize2'
 LANGUAGE C IMMUTABLE STRICT;
 
-CREATE OR REPLACE FUNCTION _pq_plan_explain(query_string text)
+CREATE OR REPLACE FUNCTION _pq_plan_explain(query_string text, plan_analyze bool DEFAULT false)
 RETURNS text
 AS '$libdir/cuckoo','pq_plan_explain'
 LANGUAGE C IMMUTABLE STRICT;

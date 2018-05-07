@@ -398,6 +398,8 @@ pq_plan_explain(PG_FUNCTION_ARGS)
     ExplainState *es = NewExplainState();
     es->costs = false;
     es->verbose = true;
+    es->analyze = PG_GETARG_BOOL(1);
+    es->summary = es->analyze;
     ExplainBeginOutput(es);
     PG_TRY();
     {
