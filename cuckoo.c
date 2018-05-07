@@ -60,6 +60,9 @@
 
 #include "optimizer/planner.h"
 
+#include "commands/explain.h"
+#include "utils/snapmgr.h"
+
 #ifdef PG_MODULE_MAGIC
 PG_MODULE_MAGIC;
 #endif
@@ -375,6 +378,54 @@ pq_plan_deserialize(PG_FUNCTION_ARGS)
   // </Query-Plan Injection Code>
 
   PG_RETURN_TEXT_P(outputstr);
+}
+
+PG_FUNCTION_INFO_V1(pq_plan_explain);
+
+Datum
+pq_plan_explain(PG_FUNCTION_ARGS)
+{
+  text *nodeText = PG_GETARG_TEXT_P(0);
+  Node *plan;
+
+  char *nodeChar = text_to_cstring(nodeText);
+
+  // Deserialize the Plan
+  plan = (Node*) stringToNode(nodeChar);
+
+  if (IsA(plan, PlannedStmt))
+  {
+    ExplainState *es = NewExplainState();
+    es->costs = false;
+    es->verbose = true;
+    ExplainBeginOutput(es);
+    PG_TRY();
+    {
+      ExplainOnePlan((PlannedStmt *)plan, NULL,
+             es, NULL, 
+#if PG_VERSION_NUM >= 100000
+             NULL, create_queryEnv(), NULL);
+#else
+             NULL, NULL);
+#endif
+      PG_RETURN_TEXT_P(cstring_to_text(es->str->data));
+    }
+    PG_CATCH();
+    {
+      /* Magic hack but work. In ExplainOnePlan we twice touched snapshot before die.*/
+      UnregisterSnapshot(GetActiveSnapshot());
+      UnregisterSnapshot(GetActiveSnapshot());
+      PopActiveSnapshot();
+      ExplainEndOutput(es);
+      PG_RETURN_TEXT_P(cstring_to_text("Invalid plan"));
+    }
+    PG_END_TRY();
+    ExplainEndOutput(es);
+  }
+  else
+  {
+    PG_RETURN_TEXT_P(cstring_to_text("Not found plan"));
+  }
 }
 
 // AST-Node generators
