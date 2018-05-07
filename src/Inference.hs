@@ -198,16 +198,11 @@ trOperator n@(I.SORT { I.targetlist, I.operator, I.sortCols })
     let collations = O.PlainList $ replicate numCols 0
     let nullsFirst = O.PlainList $ map (O.PgBool . I.sortNullsFirst) sortCols
 
-    let sortTargets = map I.sortTarget sortCols
-    let targetExprs = map (getExprType . O.expr)
-                          $ filter (\(O.TARGETENTRY {O.ressortgroupref=x}) -> x `elem` sortTargets) targetlist'
-    let targetOps  = map ((\x -> if x then "<" else ">") . I.sortASC) sortCols
-
-    opnos <- mapM searchOperator $ zip targetExprs targetOps
+    opnos <- mapM (trSortEx targetlist') sortCols
 
     when (null opnos) $ error "no opnos found"
 
-    let sortOperators = O.PlainList opnos
+    let sortOperators = O.PlainList $ map O.sortop opnos
     let sortColIdx    = O.PlainList $ map I.sortTarget sortCols
 
     return $ O.SORT
@@ -264,7 +259,7 @@ trOperator (I.AGG {I.targetlist, I.operator, I.groupCols})
                           $ filter (\(O.TARGETENTRY {O.ressortgroupref=x}) -> x `elem` groupCols) targetlist'
 
     -- Try to find function in pg_operator by name and argument types
-    ops <- mapM searchOperator $ zip grpTargets (repeat "=")
+    ops <- mapM ((liftM fst) . searchOperator) $ zip grpTargets (repeat "=")
 
 
 
@@ -287,32 +282,34 @@ trOperator (I.MATERIAL {I.operator})
     operator' <- trOperator operator
 
     let genPlan = zip [1..] $ ( (\(O.List x) -> x) . O.targetlist . O.genericPlan) operator'
-    let targetlist' = map (\(n, O.TARGETENTRY{O.expr=e, O.resname=resname}) -> 
-                          O.TARGETENTRY
-                            { O.expr=
-                                O.VAR
-                                  { O.varno       = 65001
-                                  , O.varattno    = n
-                                  , O.vartype     = getExprType e
-                                  , O.vartypmod   = -1
-                                  , O.varcollid   = 0
-                                  , O.varlevelsup = 0
-                                  , O.varnoold    = n
-                                  , O.varoattno   = n
-                                  , O.location    = -1
-                                  }
-                            , O.resno = n
-                            , O.resname = resname
-                            , O.ressortgroupref = 0
-                            , O.resorigtbl = 0
-                            , O.resorigcol = 0
-                            , O.resjunk = O.PgBool False
-                            } ) genPlan
+    -- Take targetlist of sub-plan to generate references to the columns.
+    let targetlist' = map (\(n, O.TARGETENTRY{O.expr=e, O.resname=resname}) ->
+                              O.TARGETENTRY
+                                { O.expr=
+                                    O.VAR
+                                      { O.varno       = 65001
+                                      , O.varattno    = n
+                                      , O.vartype     = getExprType e
+                                      , O.vartypmod   = -1
+                                      , O.varcollid   = 0
+                                      , O.varlevelsup = 0
+                                      , O.varnoold    = n
+                                      , O.varoattno   = n
+                                      , O.location    = -1
+                                      }
+                                , O.resno = n
+                                , O.resname = resname
+                                , O.ressortgroupref = 0
+                                , O.resorigtbl = 0
+                                , O.resorigcol = 0
+                                , O.resjunk = O.PgBool False
+                                } ) genPlan
 
     return $ O.MATERIAL
-              { O.genericPlan = (O.defaultPlan { O.targetlist = O.List targetlist'
-                                               , O.lefttree = Just operator'
-                                               })
+              { O.genericPlan =
+                  (O.defaultPlan { O.targetlist = O.List targetlist'
+                                 , O.lefttree = Just operator'
+                                 })
               }
 
 trOperator (I.NESTLOOP {I.targetlist, I.joinType, I.inner_unique, I.joinquals, I.nestParams, I.lefttree, I.righttree})
@@ -371,7 +368,25 @@ createFakeTable name (O.List targets)
                   (O.TARGETENTRY { O.expr=expr, O.resname }, num) <- zip targets [1..]
                  ]
 
-searchOperator :: Rule (Integer, String) Integer
+trSortEx :: Rule2 [O.TARGETENTRY] I.SortEx O.SORTGROUPCLAUSE
+trSortEx targetlist (I.SortEx { I.sortTarget, I.sortASC, I.sortNullsFirst })
+  = do
+    let targetExpr:_ = filter ((==sortTarget) . O.ressortgroupref) targetlist
+    let targetType = getExprType $ O.expr targetExpr
+    let targetSortop = if sortASC then "<" else ">"
+
+    opno <- liftM fst $ searchOperator (targetType, targetSortop)
+
+    (eqop, hashable) <- searchOperator (targetType, "=")
+
+    return $ O.SORTGROUPCLAUSE
+                { O.tleSortGroupRef = sortTarget
+                , O.eqop = eqop
+                , O.sortop = opno
+                , O.nulls_first = O.PgBool sortNullsFirst
+                , O.hashable = O.PgBool hashable }
+
+searchOperator :: Rule (Integer, String) (Integer, Bool)
 searchOperator (typ, op)
   = do
     -- Get tables from context, we have to do it that way instead of via
@@ -388,8 +403,9 @@ searchOperator (typ, op)
     when (null row)
       $ error $ "searchOperator: no operator found"
 
-    let opno      = fromSql $ head row M.! "oid"
-    return opno
+    let opno       = fromSql $ head row M.! "oid"
+    let oprcanhash = fromSql $ head row M.! "oprcanhash"
+    return (opno, oprcanhash)
 
 
 trTargetEntry :: Rule (I.TargetEntry, Integer) O.TARGETENTRY
@@ -643,6 +659,7 @@ getExprType (O.VAR { O.vartype }) = vartype
 getExprType (O.CONST { O.consttype }) = consttype
 getExprType (O.FUNCEXPR { O.funcresulttype }) = funcresulttype
 getExprType (O.OPEXPR { O.opresulttype }) = opresulttype
+getExprType (O.AGGREF { O.aggtype }) = aggtype
 
 getExprType x = error $ "getExprType not implemented for: " ++ PP.ppShow x
 
