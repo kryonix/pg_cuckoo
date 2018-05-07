@@ -65,15 +65,24 @@ extract op = let
     mapM_ (~~~>) targetlist
     (~>) operator
 
+(~>) (APPEND {targetlist, appendplans})
+  = do
+    mapM_ (~~~>) targetlist
+    mapM_ (~>) appendplans
+
 (~>) (AGG {targetlist, operator})
   = do
     mapM_ (~~~>) targetlist
     (~>) operator
 
-(~>) (APPEND {targetlist, appendplans})
+(~>) (MATERIAL {operator}) = (~>) operator
+
+(~>) (NESTLOOP {targetlist, joinquals, nestParams, lefttree, righttree})
   = do
     mapM_ (~~~>) targetlist
-    mapM_ (~>) appendplans
+    mapM_ (~~>) joinquals
+    (~>) lefttree
+    (~>) righttree
 
 -- | TargetEntry extract
 (~~~>) :: Rule I.TargetEntry ()

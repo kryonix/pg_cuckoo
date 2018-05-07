@@ -89,6 +89,16 @@ validateExpr op = let
     mapM_ (~~~>) targetlist
     (~>) operator
 
+(~>) (MATERIAL {operator}) = (~>) operator
+
+(~>) (NESTLOOP {targetlist, joinquals, nestParams, lefttree, righttree})
+  = do
+    mapM_ (~~~>) targetlist
+    mapM_ (~~>) joinquals
+
+    (~>) lefttree
+    (~>) righttree
+
 -- | TargetEntry validator
 (~~~>) :: Rule I.TargetEntry ()
 (~~~>) (TargetEntry { targetexpr, targetresname })

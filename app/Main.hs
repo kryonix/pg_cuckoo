@@ -315,8 +315,72 @@ agg2 = A.AGG
               , A.qual = []
               , A.scanrelation = "grp"
               }
-        , A.groupCols = [2]
+        , A.groupCols = []
         }
+
+nestLoop1 :: A.Operator
+nestLoop1 = A.NESTLOOP
+            { A.targetlist =
+                [ A.TargetEntry
+                    { A.targetexpr = A.VAR "OUTER_VAR" "a"
+                    , A.targetresname = "a"
+                    , A.resjunk = False
+                    }
+                , A.TargetEntry
+                    { A.targetexpr = A.VAR "OUTER_VAR" "b"
+                    , A.targetresname = "b"
+                    , A.resjunk = False
+                    }
+                , A.TargetEntry
+                    { A.targetexpr = A.VAR "INNER_VAR" "x"
+                    , A.targetresname = "x"
+                    , A.resjunk = False
+                    }
+                , A.TargetEntry
+                    { A.targetexpr = A.VAR "INNER_VAR" "y"
+                    , A.targetresname = "y"
+                    , A.resjunk = False
+                    }
+                ]
+            , A.joinType = A.INNER
+            , A.inner_unique = False
+            , A.joinquals = []
+            , A.nestParams = []
+            , A.lefttree =
+                A.SEQSCAN
+                  { A.targetlist =
+                      [ A.TargetEntry
+                          { A.targetexpr = A.VAR "grp" "a"
+                          , A.targetresname = "a"
+                          , A.resjunk = False
+                          }
+                      , A.TargetEntry
+                          { A.targetexpr = A.VAR "grp" "b"
+                          , A.targetresname = "b"
+                          , A.resjunk = False
+                          }
+                      ]
+                  , A.qual = []
+                  , A.scanrelation = "grp"
+                  }
+            , A.righttree =
+                A.SEQSCAN
+                  { A.targetlist =
+                      [ A.TargetEntry
+                          { A.targetexpr = A.VAR "grp" "a"
+                          , A.targetresname = "x"
+                          , A.resjunk = False
+                          }
+                      , A.TargetEntry
+                          { A.targetexpr = A.VAR "grp" "b"
+                          , A.targetresname = "y"
+                          , A.resjunk = False
+                          }
+                      ]
+                  , A.qual = []
+                  , A.scanrelation = "grp"
+                  }
+            }
 
 -- access list elements safely
 (!!) :: [a] -> Int -> Maybe a
@@ -354,7 +418,10 @@ checkAndGenerate authStr op = do
   
   -- Print AST structure as well as the postgres plan
   putStrLn $ PP.ppShow infered
-  putStrLn $ gprint infered
+  let pgplan = gprint infered
+  putStrLn $ pgplan
+  putStrLn $ "select _pq_plan_deserialize('" ++ pgplan ++ "');"
+
 
 main :: IO ()
 main = do
@@ -367,4 +434,4 @@ main = do
     let cp = forceEither config
     let authStr = forceEither $ get cp "Main" "dbauth" :: String
 
-    checkAndGenerate authStr agg2
+    checkAndGenerate authStr nestLoop1

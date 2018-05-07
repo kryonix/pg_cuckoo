@@ -8,7 +8,9 @@ Author      : Denis Hirn
 module InAST ( Operator(..)
              , TargetEntry(..)
              , SortEx(..)
-             , Expr(..) ) where
+             , Expr(..)
+             , JoinType(..)
+             , NestLoopParam(..) ) where
 
 data Operator = SEQSCAN
                 { targetlist   :: [TargetEntry]
@@ -38,8 +40,36 @@ data Operator = SEQSCAN
                 , operator    :: Operator
                 , groupCols   :: [Integer]
                 }
+              | MATERIAL
+                { operator :: Operator }
+              | NESTLOOP
+                { targetlist   :: [TargetEntry]
+                , joinType     :: JoinType      -- ^ rule for joining tuples from left and right subtrees
+                , inner_unique :: Bool          -- ^ each outer tuple can match to no more than one inner tuple
+                , joinquals    :: [Expr]        -- ^ qual conditions that came from JOIN/ON or JOIN/USING
+                , nestParams   :: [NestLoopParam]
+                , lefttree     :: Operator
+                , righttree    :: Operator
+                }
     deriving(Eq, Show)
 
+
+{-
+   nest loop join node
+
+ The nestParams list identifies any executor Params that must be passed
+ into execution of the inner subplan carrying values from the current row
+ of the outer subplan.  Currently we restrict these values to be simple
+ Vars, but perhaps someday that'd be worth relaxing.  (Note: during plan
+ creation, the paramval can actually be a PlaceHolderVar expression; but it
+ must be a Var with varno OUTER_VAR by the time it gets to the executor.)
+-}
+
+data NestLoopParam = NestLoopParam
+                      { paramno  :: Integer
+                      , paramval :: Expr
+                      }
+    deriving (Eq, Show)
 
 data TargetEntry = TargetEntry
                     { targetexpr    :: Expr
@@ -80,4 +110,12 @@ data Expr = VAR
             , aggfilter     :: Maybe Expr
             , aggstar       :: Bool
             }
+    deriving (Eq, Show)
+
+data JoinType = INNER
+              | LEFT
+              | FULL
+              | RIGHT
+              | SEMI
+              | ANTI
     deriving (Eq, Show)

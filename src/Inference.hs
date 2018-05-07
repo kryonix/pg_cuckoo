@@ -162,7 +162,7 @@ trOperator n@(I.SEQSCAN { I.targetlist, I.qual, I.scanrelation })
               ++ "\n" ++ PP.ppShow n
 
     rtables <- getRTables ()
-    let [rtable] = filter (\x -> tName x == scanrelation) rtables
+    let rtable:_ = filter (\x -> tName x == scanrelation) rtables
     let (Just index) = elemIndex rtable rtables
     let index' = fromIntegral index + 1
     return $ O.SEQSCAN (O.defaultPlan { O.targetlist=O.List targetlist'
@@ -229,23 +229,7 @@ trOperator (I.APPEND {I.targetlist, I.appendplans})
     -- Generate a fake table with fake columns.
     -- We need this to perform inference of VAR, referencing
     -- sub-operators.
-    let (O.List fstPlanTargets) = (O.targetlist $ O.genericPlan (head appendplans'))
-
-    let fakeCols =  [ PgColumn
-                      { cAttname      = maybe "" id resname
-                      , cAtttypid     = getExprType expr
-                      , cAttlen       = 0
-                      , cAttnum       = num
-                      , cAtttypmod    = -1
-                      , cAttcollation = 0
-                      }
-                    |
-                      (O.TARGETENTRY { O.expr=expr, O.resname }, num) <- zip fstPlanTargets [1..]
-                    ]
-
-    let fakeTable = PgTable { tOID  = -1, tName = "OUTER_VAR"
-                            , tKind = "", tCols = fakeCols }
-
+    let fakeTable = createFakeTable "OUTER_VAR" (O.targetlist $ O.genericPlan (head appendplans'))
     -- Get rid of existing fake-tables (maybe not required?)
     let rtablesC = dropWhile (\(PgTable {tOID}) -> tOID == -1) $ rtables context
     let context' = context {rtables=fakeTable:rtablesC}
@@ -268,22 +252,7 @@ trOperator (I.AGG {I.targetlist, I.operator, I.groupCols})
     -- Generate a fake table with fake columns.
     -- We need this to perform inference of VAR, referencing
     -- sub-operators.
-    let (O.List fstPlanTargets) = (O.targetlist $ O.genericPlan operator')
-
-    let fakeCols =  [ PgColumn
-                      { cAttname      = maybe "" id resname
-                      , cAtttypid     = getExprType expr
-                      , cAttlen       = 0
-                      , cAttnum       = num
-                      , cAtttypmod    = -1
-                      , cAttcollation = 0
-                      }
-                    |
-                      (O.TARGETENTRY { O.expr=expr, O.resname }, num) <- zip fstPlanTargets [1..]
-                    ]
-
-    let fakeTable = PgTable { tOID  = -1, tName = "OUTER_VAR"
-                            , tKind = "", tCols = fakeCols }
+    let fakeTable = createFakeTable "OUTER_VAR" (O.targetlist $ O.genericPlan operator')
     -- Get rid of existing fake-tables (maybe not required?)
     let rtablesC = dropWhile (\(PgTable {tOID}) -> tOID == -1) $ rtables context
     let context' = context {rtables=fakeTable:rtablesC}
@@ -311,8 +280,96 @@ trOperator (I.AGG {I.targetlist, I.operator, I.groupCols})
               , O.aggParams    = O.Bitmapset []
               , O.groupingSets = O.Null
               , O.chain        = O.Null
-            }
+              }
 
+trOperator (I.MATERIAL {I.operator})
+  = do
+    operator' <- trOperator operator
+
+    let genPlan = zip [1..] $ ( (\(O.List x) -> x) . O.targetlist . O.genericPlan) operator'
+    let targetlist' = map (\(n, O.TARGETENTRY{O.expr=e, O.resname=resname}) -> 
+                          O.TARGETENTRY
+                            { O.expr=
+                                O.VAR
+                                  { O.varno       = 65001
+                                  , O.varattno    = n
+                                  , O.vartype     = getExprType e
+                                  , O.vartypmod   = -1
+                                  , O.varcollid   = 0
+                                  , O.varlevelsup = 0
+                                  , O.varnoold    = n
+                                  , O.varoattno   = n
+                                  , O.location    = -1
+                                  }
+                            , O.resno = n
+                            , O.resname = resname
+                            , O.ressortgroupref = 0
+                            , O.resorigtbl = 0
+                            , O.resorigcol = 0
+                            , O.resjunk = O.PgBool False
+                            } ) genPlan
+
+    return $ O.MATERIAL
+              { O.genericPlan = (O.defaultPlan { O.targetlist = O.List targetlist'
+                                               , O.lefttree = Just operator'
+                                               })
+              }
+
+trOperator (I.NESTLOOP {I.targetlist, I.joinType, I.inner_unique, I.joinquals, I.nestParams, I.lefttree, I.righttree})
+  = do
+    lefttree' <- trOperator lefttree
+    righttree' <- trOperator righttree
+
+    context <- lift $ ask
+
+    let fakeOuter = createFakeTable "OUTER_VAR" (O.targetlist $ O.genericPlan lefttree')
+    let fakeInner = createFakeTable "INNER_VAR" (O.targetlist $ O.genericPlan righttree')
+    let fakeTables = [fakeOuter, fakeInner]
+
+    -- Get rid of existing fake-tables (maybe not required?)
+    let rtablesC = dropWhile (\(PgTable {tOID}) -> tOID == -1) $ rtables context
+    let context' = context {rtables=fakeTables++rtablesC}
+
+    targetlist' <- local (const context') $ mapM trTargetEntry $ zip targetlist [1..]
+    joinquals'  <- local (const context') $ mapM trExpr joinquals
+
+    let joinType' = case joinType of
+                      I.INNER -> 0
+                      I.LEFT  -> 1
+                      I.FULL  -> 2
+                      I.RIGHT -> 3
+                      I.SEMI  -> 4
+                      I.ANTI  -> 5
+
+    return $ O.NESTLOOP
+              { O.genericPlan = O.defaultPlan 
+                                  { O.targetlist = O.List targetlist'
+                                  , O.lefttree = Just lefttree'
+                                  , O.righttree = Just righttree'
+                                  }
+              , O.jointype = joinType'
+              , O.inner_unique = O.PgBool inner_unique
+              , O.joinquals = O.List joinquals'
+              , O.nestParams = O.List []
+              }
+
+-- | Takes a list of targetentries and a name to generate a fake table
+-- This table is used for VAR "{INNER,OUTER}_VAR" references.
+createFakeTable :: String -> (O.List O.TARGETENTRY) -> PgTable
+createFakeTable name (O.List targets)
+  = PgTable { tOID = -1, tName = name, tKind = "", tCols = fakeCols }
+    where
+      fakeCols = [ PgColumn
+                    { cAttname      = maybe "" id resname
+                    , cAtttypid     = getExprType expr
+                    , cAttlen       = 0
+                    , cAttnum       = num
+                    , cAtttypmod    = -1
+                    , cAttcollation = 0
+                    }
+                 |
+                  (O.TARGETENTRY { O.expr=expr, O.resname }, num) <- zip targets [1..]
+                 ]
 
 searchOperator :: Rule (Integer, String) Integer
 searchOperator (typ, op)
@@ -366,12 +423,13 @@ trExpr c@(I.CONST {})
 trExpr (I.VAR { I.varTable, I.varColumn })
   = do
     rtables <- getRTables ()
-    let [rtable] = filter (\x -> tName x == varTable) rtables
-    let [column] = filter (\x -> cAttname x == varColumn) $ tCols rtable
+    let rtable:_ = filter (\x -> tName x == varTable) rtables
+    let column:_ = filter (\x -> cAttname x == varColumn) $ tCols rtable
     -- Calculate the index of the table in rtable of PlannedStmt
     let (Just index) = elemIndex rtable rtables
     -- Postgres enumerates these indizes from 1, so we have to increment the value
     let index' = case varTable of
+                  "INNER_VAR" -> 65000
                   "OUTER_VAR" -> 65001
                   _ -> fromIntegral index + 1
 

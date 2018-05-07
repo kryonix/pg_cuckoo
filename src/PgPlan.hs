@@ -33,6 +33,7 @@ module PgPlan ( Null(..)
               , List(..)
               , PgBool(..)
               , SORTGROUPCLAUSE(..)
+              , NestLoopParam(..)
               ) where
 
 import GPrint
@@ -258,7 +259,19 @@ data Plan = RESULT
             , aggParams    :: Bitmapset         -- ^ IDs of Params used in Aggref inputs
             , groupingSets :: Null              -- ^ grouping sets to use
             , chain        :: Null              -- ^ chained Agg/Sort nodes
-          }
+            }
+          | MATERIAL
+            { genericPlan :: GenericPlan }
+          | NESTLOOP
+            { genericPlan :: GenericPlan
+            , jointype    :: Integer
+            , inner_unique :: PgBool
+            , joinquals    :: List Expr
+            , nestParams   :: List NestLoopParam
+            }
+    deriving (Eq, Show, Generic, GPrint)
+
+data NestLoopParam = FIXME Null
     deriving (Eq, Show, Generic, GPrint)
 
 data RangeEx = RTE
