@@ -350,6 +350,26 @@ trOperator (I.NESTLOOP {I.targetlist, I.joinType, I.inner_unique, I.joinquals, I
               , O.nestParams = O.List []
               }
 
+trOperator (I.UNIQUE {I.operator, I.uniqueCols})
+  = do
+    operator' <- trOperator operator
+    let targetlist = ((\(O.List x) -> x) . O.targetlist . O.genericPlan) operator'
+
+    let grpTargets = map (getExprType . O.expr)
+                      $ filter (\(O.TARGETENTRY {O.ressortgroupref=x}) -> x `elem` uniqueCols) targetlist
+
+    -- Try to find function in pg_operator by name and argument types
+    ops <- mapM ((liftM fst) . searchOperator) $ zip grpTargets (repeat "=")
+
+    return $ O.UNIQUE
+              { O.genericPlan = O.defaultPlan 
+                                { O.targetlist = O.List targetlist
+                                , O.lefttree = Just operator' }
+              , O.numCols = fromIntegral $ length uniqueCols
+              , O.uniqColIdx = O.PlainList uniqueCols
+              , O.uniqOperators = O.PlainList ops
+              }
+
 -- | Takes a list of targetentries and a name to generate a fake table
 -- This table is used for VAR "{INNER,OUTER}_VAR" references.
 createFakeTable :: String -> (O.List O.TARGETENTRY) -> PgTable
@@ -631,6 +651,9 @@ trExpr n@(I.AGGREF {I.aggname, I.aggargs, I.aggdirectargs, I.aggorder, I.aggdist
     aggdirectargs' <- mapM trExpr aggdirectargs
     aggfilter'     <- mapM trExpr aggfilter
 
+    aggorder'    <- mapM (trSortEx args') aggorder
+    aggdistinct' <- mapM (trSortEx args') aggdistinct
+
     return $ O.AGGREF
             { O.aggfnoid      = prooid
             , O.aggtype       = prorettype
@@ -640,8 +663,8 @@ trExpr n@(I.AGGREF {I.aggname, I.aggargs, I.aggdirectargs, I.aggorder, I.aggdist
             , O.aggargtypes   = aggargtypes
             , O.aggdirectargs = O.List aggdirectargs'
             , O._args         = O.List args'
-            , O.aggorder      = O.List [] -- :: List SORTGROUPCLAUSE -- ^ ORDER BY
-            , O.aggdistinct   = O.List [] -- :: List SORTGROUPCLAUSE -- ^ DISTINCT
+            , O.aggorder      = O.List aggorder'
+            , O.aggdistinct   = O.List aggdistinct'
             , O.aggfilter     = aggfilter'
             , O.aggstar       = O.PgBool aggstar
             , O.aggvariadic   = O.PgBool False

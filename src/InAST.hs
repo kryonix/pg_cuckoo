@@ -22,7 +22,7 @@ data Operator = SEQSCAN
                 , resconstantqual :: Maybe Expr
                 }
               | LIMIT
-                { operator :: Operator
+                { operator    :: Operator
                 , limitOffset :: Maybe Expr
                 , limitCount  :: Maybe Expr
                 }
@@ -32,7 +32,7 @@ data Operator = SEQSCAN
                 , sortCols   :: [SortEx]
                 }
               | APPEND
-                { targetlist :: [TargetEntry]
+                { targetlist  :: [TargetEntry]
                 , appendplans :: [Operator]
                 }
               | AGG
@@ -50,6 +50,10 @@ data Operator = SEQSCAN
                 , nestParams   :: [NestLoopParam]
                 , lefttree     :: Operator
                 , righttree    :: Operator
+                }
+              | UNIQUE
+                { operator   :: Operator
+                , uniqueCols :: [Integer]
                 }
     deriving(Eq, Show)
 

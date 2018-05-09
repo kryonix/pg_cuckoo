@@ -84,6 +84,8 @@ extract op = let
     (~>) lefttree
     (~>) righttree
 
+(~>) (UNIQUE {operator}) = (~>) operator
+
 -- | TargetEntry extract
 (~~~>) :: Rule I.TargetEntry ()
 (~~~>) (I.TargetEntry { targetexpr }) = (~~>) targetexpr

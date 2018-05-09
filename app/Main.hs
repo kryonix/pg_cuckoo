@@ -133,7 +133,7 @@ seq4 = A.SEQSCAN
                                   { A.funcname="int4pl"
                                   , A.funcargs=
                                       [ A.VAR {A.varTable="grp", A.varColumn="a"}
-                                      --, A.VAR {A.varTable="grp", A.varColumn="b"}
+                                      , A.VAR {A.varTable="grp", A.varColumn="b"}
                                       ] 
                                   }
                                 ]
@@ -382,6 +382,22 @@ nestLoop1 = A.NESTLOOP
                   }
             }
 
+unique1 :: A.Operator
+unique1 = A.UNIQUE
+          { A.operator =
+              A.SEQSCAN
+                { A.targetlist = 
+                    [ A.TargetEntry
+                      { A.targetexpr = A.VAR "grp" "a"
+                      , A.targetresname = "a"
+                      , A.resjunk = False }
+                    ]
+                , A.qual = []
+                , A.scanrelation = "grp"
+                }
+          , A.uniqueCols = [1]
+          }
+
 -- access list elements safely
 (!!) :: [a] -> Int -> Maybe a
 (!!) lst idx = if idx >= length lst
@@ -434,4 +450,4 @@ main = do
     let cp = forceEither config
     let authStr = forceEither $ get cp "Main" "dbauth" :: String
 
-    checkAndGenerate authStr nestLoop1
+    checkAndGenerate authStr unique1

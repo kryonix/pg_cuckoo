@@ -17,6 +17,8 @@ module Validate ( validateOperator
 import OperSem
 import InAST as I
 
+import Data.Maybe
+
 import qualified Text.Show.Pretty as PP
 
 data Log = Log { errors :: [ String ] }
@@ -71,9 +73,13 @@ validateExpr op = let
     (~>) operator
     mapM_ (~~>) limitOffset
     mapM_ (~~>) limitCount
+    when (isNothing limitOffset && isNothing limitCount)
+      $ logError $ "LIMIT: neither limitOffset nor limitCount specified"
 
-(~>) (SORT {targetlist, operator})
+(~>) (SORT {targetlist, operator, sortCols})
   = do
+    when (null sortCols)
+      $ logError $ "SORT: no sortCols specified"
     mapM_ (~~~>) targetlist
     (~>) operator
 
@@ -98,6 +104,12 @@ validateExpr op = let
 
     (~>) lefttree
     (~>) righttree
+
+(~>) (UNIQUE {operator, uniqueCols})
+  = do
+    when (null uniqueCols)
+      $ logError $ "UNIQUE: no uniqueCols specified"
+    (~>) operator
 
 -- | TargetEntry validator
 (~~~>) :: Rule I.TargetEntry ()

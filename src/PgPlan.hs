@@ -269,6 +269,12 @@ data Plan = RESULT
             , joinquals    :: List Expr
             , nestParams   :: List NestLoopParam
             }
+          | UNIQUE
+            { genericPlan :: GenericPlan
+            , numCols     :: Integer
+            , uniqColIdx  :: PlainList Integer
+            , uniqOperators :: PlainList Integer
+            }
     deriving (Eq, Show, Generic, GPrint)
 
 data NestLoopParam = FIXME Null
