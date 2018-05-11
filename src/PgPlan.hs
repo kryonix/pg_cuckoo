@@ -243,6 +243,12 @@ data Plan = RESULT
             , collations    :: PlainList Integer
             , nullsFirst    :: PlainList PgBool
             }
+          | GROUP
+            { genericPlan  :: GenericPlan
+            , numCols      :: Integer
+            , grpColIdx    :: PlainList Integer
+            , grpOperators :: PlainList Integer
+            }
           | APPEND
             { genericPlan :: GenericPlan
             , partitioned_rels :: Null

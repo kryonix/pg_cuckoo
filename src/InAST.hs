@@ -35,6 +35,12 @@ data Operator = SEQSCAN
                 , operator   :: Operator
                 , sortCols   :: [SortEx]
                 }
+              | GROUP
+                { targetlist :: [TargetEntry]
+                , qual       :: [Expr]
+                , operator   :: Operator
+                , groupCols  :: [Integer]
+                }
               | APPEND
                 { targetlist  :: [TargetEntry]
                 , appendplans :: [Operator]

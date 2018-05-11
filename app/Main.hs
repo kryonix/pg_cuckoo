@@ -500,6 +500,31 @@ functionscan1 = A.FUNCTIONSCAN
                   , A.funcordinality = False
                   }
 
+group1 :: A.Operator
+group1 = A.GROUP
+          { A.targetlist =
+            [ A.TargetEntry
+              { A.targetexpr = A.VAR "OUTER_VAR" "a"
+              , A.targetresname = "a"
+              , A.resjunk = False
+              }
+            ]
+          , A.qual = []
+          , A.operator =
+            A.SEQSCAN
+              { A.targetlist =
+                [ A.TargetEntry
+                  { A.targetexpr = A.VAR "grp" "a"
+                  , A.targetresname = "a"
+                  , A.resjunk = False
+                  }
+                ]
+              , A.qual = []
+              , A.scanrelation = "grp"
+              }
+          , A.groupCols = [1]
+          }
+
 -- access list elements safely
 (!!) :: [a] -> Int -> Maybe a
 (!!) lst idx = if idx >= length lst
@@ -552,4 +577,4 @@ main = do
     let cp = forceEither config
     let authStr = forceEither $ get cp "Main" "dbauth" :: String
 
-    checkAndGenerate authStr functionscan1
+    checkAndGenerate authStr group1

@@ -296,6 +296,40 @@ trOperator n@(I.SORT { I.targetlist, I.operator, I.sortCols })
               , O.nullsFirst = nullsFirst
               }
 
+trOperator (I.GROUP { I.targetlist, I.qual, I.operator, I.groupCols})
+  = do
+    context <- lift $ ask
+    operator' <- trOperator operator
+
+    -- OUTER_PLAN = first of appendplans
+    -- Generate a fake table with fake columns.
+    -- We need this to perform inference of VAR, referencing
+    -- sub-operators.
+    let fakeTable = createFakeTable "OUTER_VAR" (O.targetlist $ O.genericPlan operator')
+    -- Get rid of existing fake-tables (maybe not required?)
+    let rtablesC = dropWhile (\(PgTable {tOID}) -> tOID == -1) $ rtables context
+    let context' = context {rtables=fakeTable:rtablesC}
+
+    targetlist' <- local (const context') $ mapM trTargetEntry $ zip targetlist [1..]
+
+    let grpTargets = map (getExprType . O.expr)
+                          $ filter (\(O.TARGETENTRY {O.ressortgroupref=x}) -> x `elem` groupCols) targetlist'
+
+    -- Try to find function in pg_operator by name and argument types
+    ops <- mapM ((liftM fst) . searchOperator) $ zip grpTargets (repeat "=")
+
+    qual' <- mapM trExpr qual
+
+    return $ O.GROUP
+              { O.genericPlan  = (O.defaultPlan
+                                  { O.targetlist= O.List targetlist'
+                                  , O.lefttree = Just operator'
+                                  , O.qual     = O.List qual' })
+              , O.numCols      = fromIntegral (length groupCols)
+              , O.grpColIdx    = O.PlainList groupCols
+              , O.grpOperators = O.PlainList ops
+              }
+
 trOperator (I.APPEND {I.targetlist, I.appendplans})
   = do
     context <- lift $ ask
@@ -383,8 +417,6 @@ trOperator (I.AGG {I.targetlist, I.operator, I.groupCols})
 
     -- Try to find function in pg_operator by name and argument types
     ops <- mapM ((liftM fst) . searchOperator) $ zip grpTargets (repeat "=")
-
-
 
     return $ O.AGG
               { O.genericPlan  = (O.defaultPlan { O.targetlist= O.List targetlist'

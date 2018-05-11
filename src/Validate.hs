@@ -88,6 +88,14 @@ validateExpr op = let
     mapM_ (~~~>) targetlist
     (~>) operator
 
+(~>) (GROUP {targetlist, qual, operator, groupCols})
+  = do
+    when (null groupCols)
+      $ logError $ "GROUP: no groupCols specified"
+    mapM_ (~~~>) targetlist
+    mapM_ (~~>) qual
+    (~>) operator
+
 (~>) (APPEND {targetlist, appendplans})
   = do
     mapM_ (~~~>) targetlist

@@ -76,6 +76,12 @@ extract op = let
     mapM_ (~~~>) targetlist
     (~>) operator
 
+(~>) (GROUP {targetlist, qual, operator})
+  = do
+    mapM_ (~~~>) targetlist
+    mapM_ (~~>) qual
+    (~>) operator
+
 (~>) (APPEND {targetlist, appendplans})
   = do
     mapM_ (~~~>) targetlist
