@@ -64,6 +64,12 @@ data Operator = SEQSCAN
                 { operator   :: Operator
                 , uniqueCols :: [Integer]
                 }
+              | FUNCTIONSCAN
+                { targetlist     :: [TargetEntry]
+                , qual           :: [Expr]
+                , functions      :: [Expr]
+                , funcordinality :: Bool
+                }
               | VALUESSCAN
                 { targetlist  :: [TargetEntry]
                 , qual        :: [Expr]
@@ -107,7 +113,7 @@ data Expr = VAR
             { varTable  :: String
             , varColumn :: String
             }
-          | VALUESVAR
+          | SCANVAR
             { colPos :: Integer }
           | CONST
             { constvalue :: String

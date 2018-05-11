@@ -285,6 +285,12 @@ data Plan = RESULT
             , uniqColIdx    :: PlainList Integer
             , uniqOperators :: PlainList Integer
             }
+          | FUNCTIONSCAN
+            { genericPlan    :: GenericPlan
+            , scanrelid      :: Integer
+            , functions      :: List Expr
+            , funcordinality :: PgBool
+            }
           | VALUESSCAN
             { genericPlan :: GenericPlan
             , scanrelid   :: Integer
@@ -329,6 +335,22 @@ data RangeEx = RTE
                 , insertedCols  :: Bitmapset
                 , updatedCols   :: Bitmapset
                 , securityQuals :: Null
+                }
+             | RTE_FUNCTIONS
+                { alias           :: Maybe Alias
+                , eref            :: Alias
+                , rtekind         :: Integer
+                , _functions      :: Null
+                , _funcordinality :: PgBool
+                , lateral         :: PgBool
+                , inh             :: PgBool
+                , inFromCl        :: PgBool
+                , requiredPerms   :: Integer
+                , checkAsUser     :: Integer
+                , selectedCols    :: Bitmapset
+                , insertedCols    :: Bitmapset
+                , updatedCols     :: Bitmapset
+                , securityQuals   :: Null
                 }
     deriving (Eq, Show, Generic, GPrint)
 
@@ -442,6 +464,15 @@ data Expr = VAR
             , agglevelsup   :: Integer              -- ^ > 0 if agg belongs to outer query
             , _aggsplit      :: Integer              -- ^ expected agg-splitting mode of parent agg
             , location      :: Integer              -- ^ token location, or -1 if unknown
+            }
+          | RANGETBLFUNCTION
+            { funcexpr :: Expr
+            , funccolcount :: Integer
+            , funccolnames :: Null
+            , funccoltypes :: Null
+            , funccoltypmods :: Null
+            , funccolcollations :: Null
+            , funcparams :: Bitmapset
             }
     deriving (Eq, Show, Generic, GPrint)
 

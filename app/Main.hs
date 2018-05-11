@@ -402,11 +402,11 @@ values1 :: A.Operator
 values1 = A.VALUESSCAN
           { A.targetlist =
               [ A.TargetEntry
-                { A.targetexpr = A.VALUESVAR 1
+                { A.targetexpr = A.SCANVAR 1
                 , A.targetresname = "a"
                 , A.resjunk = False }
               , A.TargetEntry
-                { A.targetexpr = A.VALUESVAR 2
+                { A.targetexpr = A.SCANVAR 2
                 , A.targetresname = "b"
                 , A.resjunk = False }
               ]
@@ -478,6 +478,28 @@ mergeappend1 = A.MERGEAPPEND
                   [ A.SortEx { A.sortTarget = 1, A.sortASC = True, A.sortNullsFirst = False } ]
                 }
 
+functionscan1 :: A.Operator
+functionscan1 = A.FUNCTIONSCAN
+                  { A.targetlist =
+                    [ A.TargetEntry
+                      { A.targetexpr = A.SCANVAR 1
+                      , A.targetresname = "value"
+                      , A.resjunk = False
+                      }
+                    ]
+                  , A.qual = []
+                  , A.functions =
+                    [ A.FUNCEXPR
+                      { A.funcname = "generate_series"
+                      , A.funcargs =
+                        [ A.CONST "1" "int4"
+                        , A.CONST "10" "int4"
+                        ]
+                      }
+                    ]
+                  , A.funcordinality = False
+                  }
+
 -- access list elements safely
 (!!) :: [a] -> Int -> Maybe a
 (!!) lst idx = if idx >= length lst
@@ -510,7 +532,7 @@ checkAndGenerate authStr op = do
   putStrLn $ PP.ppShow consts'
 
   -- Infere output AST
-  let infered = generatePlan tableDataR consts' (lgTableNames consts) (lgValuesScan consts) op
+  let infered = generatePlan tableDataR consts' (lgTableNames consts) (lgScan consts) op
   
   -- Print AST structure as well as the postgres plan
   putStrLn $ PP.ppShow infered
@@ -530,4 +552,4 @@ main = do
     let cp = forceEither config
     let authStr = forceEither $ get cp "Main" "dbauth" :: String
 
-    checkAndGenerate authStr mergeappend1
+    checkAndGenerate authStr functionscan1

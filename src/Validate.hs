@@ -125,6 +125,13 @@ validateExpr op = let
       $ logError $ "UNIQUE: no uniqueCols specified"
     (~>) operator
 
+(~>) (FUNCTIONSCAN { targetlist, qual, functions })
+  = do
+    when (null functions)
+      $ logError $ "FUNCTIONSCAN: no functions specified"
+    mapM_ (~~~>) targetlist
+    mapM_ (~~>) qual
+
 (~>) (VALUESSCAN {targetlist, qual, values_list})
   = do
     when (null values_list)
@@ -146,9 +153,9 @@ validateExpr op = let
     when (null varTable) $ logError $ "VAR error: varTable is empty"
     when (null varColumn) $ logError $ "VAR error: varColumn is empty"
 
-(~~>) (VALUESVAR {colPos})
+(~~>) (SCANVAR {colPos})
   = do
-    when (colPos <= 0) $ logError $ "VALUESVAR error: colPos invalid"
+    when (colPos <= 0) $ logError $ "SCANVAR error: colPos invalid"
 
 (~~>) (CONST { constvalue, consttype })
   = do

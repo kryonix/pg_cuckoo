@@ -121,7 +121,7 @@ trPlannedStmt op tbls valuesScan = do
   res <- local context' $ trOperator op
 
   let rte    = map pgTableToRTE tables
-  let values = map valuesToRTE valuesScan
+  let values = map scanToRTE valuesScan
   let rtable = O.List $ rte ++ values
 
   return $ O.defaultPlannedStmt { O.planTree = res, O.rtable=rtable }
@@ -152,8 +152,8 @@ pgTableToRTE t = O.RTE
     oid = tOID t
     relkind = tKind t
 
-valuesToRTE :: I.Operator -> O.RangeEx
-valuesToRTE (I.VALUESSCAN {I.targetlist}) = O.RTE_VALUES
+scanToRTE :: I.Operator -> O.RangeEx
+scanToRTE (I.VALUESSCAN {I.targetlist}) = O.RTE_VALUES
                   { O.alias = Nothing
                   , O.eref  = erefA
                   , O.rtekind = 5
@@ -177,6 +177,28 @@ valuesToRTE (I.VALUESSCAN {I.targetlist}) = O.RTE_VALUES
                     , O.colnames  = O.List $ ["column"++show x | x <- [1..colnum]]
                     }
 
+scanToRTE (I.FUNCTIONSCAN {I.targetlist, I.funcordinality})
+  = O.RTE_FUNCTIONS
+      { O.alias = Nothing
+      , O.eref  = erefA
+      , O.rtekind = 3
+      , O._functions = O.Null
+      , O._funcordinality = O.PgBool funcordinality
+      , O.lateral = O.PgBool False
+      , O.inh     = O.PgBool False
+      , O.inFromCl = O.PgBool False
+      , O.requiredPerms = 2
+      , O.checkAsUser = 0
+      , O.selectedCols  = O.Bitmapset []
+      , O.insertedCols  = O.Bitmapset []
+      , O.updatedCols   = O.Bitmapset []
+      , O.securityQuals = O.Null
+      }
+    where
+      colnum = length $ targetlist
+      erefA = O.Alias { O.aliasname = "FUNCTION"
+                      , O.colnames  = O.List $ ["column"++show x | x <- [1..colnum]]
+                      }
 
 trOperator :: Rule I.Operator O.Plan
 trOperator n@(I.RESULT { I.targetlist=targetlist, I.resconstantqual})
@@ -471,6 +493,65 @@ trOperator (I.UNIQUE {I.operator, I.uniqueCols})
               , O.uniqOperators = O.PlainList ops
               }
 
+trOperator t@(I.FUNCTIONSCAN {I.targetlist, I.qual, I.functions, I.funcordinality})
+  = do
+    qual' <- mapM trExpr qual
+    functions' <- mapM trExpr functions
+
+    let functions'' = map
+                      (\x ->
+                          O.RANGETBLFUNCTION
+                          { O.funcexpr = x
+                          , O.funccolcount = 1
+                          , O.funccolnames = O.Null
+                          , O.funccoltypes = O.Null
+                          , O.funccoltypmods = O.Null
+                          , O.funccolcollations = O.Null
+                          , O.funcparams = O.Bitmapset [] }) functions'
+
+    targetlist' <- forM (zip targetlist [1..]) 
+                $ \x -> do
+                  let (e, n) = x
+                  case e of
+                    (I.TargetEntry
+                      { I.targetexpr = I.SCANVAR {I.colPos}
+                      , I.targetresname
+                      , I.resjunk
+                      }) -> do
+                            let expr' = O.VAR
+                                        { O.varno = n
+                                        , O.varattno = colPos
+                                        , O.vartype  = getExprType $ functions' !! (fromIntegral colPos-1)
+                                        , O.vartypmod = -1
+                                        , O.varcollid = 0
+                                        , O.varlevelsup = 0
+                                        , O.varnoold = n
+                                        , O.varoattno = colPos
+                                        , O.location = -1 }
+                            return $ (O.TARGETENTRY
+                                      { O.expr = expr'
+                                      , O.resno = n
+                                      , O.resname = Just targetresname
+                                      , O.ressortgroupref = n
+                                      , O.resorigcol = 0
+                                      , O.resorigtbl = 0
+                                      , O.resjunk = O.PgBool resjunk
+                                      })
+                    _ -> trTargetEntry (e, n)
+
+    vscans <- getValueScans ()
+    let rel:_ = filter ((==t) . fst) vscans
+    let relid = snd rel
+
+    return $ O.FUNCTIONSCAN
+              { O.genericPlan = O.defaultPlan
+                                  { O.targetlist = O.List targetlist'
+                                  , O.qual = O.List qual'}
+              , O.scanrelid = relid
+              , O.functions = O.List functions''
+              , O.funcordinality = O.PgBool funcordinality
+              }
+
 trOperator s@(I.VALUESSCAN {I.targetlist, I.qual, I.values_list})
   = do
     qual'       <- mapM trExpr qual
@@ -481,7 +562,7 @@ trOperator s@(I.VALUESSCAN {I.targetlist, I.qual, I.values_list})
                       let (e, n) = x
                       case e of
                         (I.TargetEntry
-                          { I.targetexpr = I.VALUESVAR {I.colPos}
+                          { I.targetexpr = I.SCANVAR {I.colPos}
                           , I.targetresname
                           , I.resjunk
                           }) -> do
