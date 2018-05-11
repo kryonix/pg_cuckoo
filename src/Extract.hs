@@ -14,18 +14,22 @@ import InAST as I
 
 data Log = Log { lgconsts :: [I.Expr]
                , lgTableNames :: [String]
+               , lgValuesScan :: [I.Operator]
                }
   deriving(Show)
 
 instance Monoid Log where
-    mempty = Log [] []
-    (Log e1 e2) `mappend` (Log n1 n2) = Log (e1++n1) (e2++n2)
+    mempty = Log [] [] []
+    (Log e1 e2 e3) `mappend` (Log n1 n2 n3) = Log (e1++n1) (e2++n2) (e3++n3)
 
 logConst :: Rule I.Expr ()
-logConst expr = tell (Log [expr] [])
+logConst expr = tell (Log [expr] [] [])
 
 logTable :: Rule String ()
-logTable tname = tell (Log [] [tname])
+logTable tname = tell (Log [] [tname] [])
+
+logValues :: Rule I.Operator ()
+logValues scan = tell (Log [] [] [scan])
 
 type Rule a b = a -> OperSem () () b Log
 
@@ -85,6 +89,13 @@ extract op = let
     (~>) righttree
 
 (~>) (UNIQUE {operator}) = (~>) operator
+
+(~>) s@(VALUESSCAN {targetlist, qual, values_list})
+  = do
+    logValues s
+    mapM_ (~~~>) targetlist
+    mapM_ (~~>) qual
+    mapM_ (mapM_ (~~>)) values_list
 
 -- | TargetEntry extract
 (~~~>) :: Rule I.TargetEntry ()

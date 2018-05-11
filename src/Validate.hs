@@ -111,6 +111,13 @@ validateExpr op = let
       $ logError $ "UNIQUE: no uniqueCols specified"
     (~>) operator
 
+(~>) (VALUESSCAN {targetlist, qual, values_list})
+  = do
+    when (null values_list)
+      $ logError $ "VALUESSCAN: no values specified"
+    mapM_ (~~>) qual
+    mapM_ (mapM_ (~~>)) values_list
+
 -- | TargetEntry validator
 (~~~>) :: Rule I.TargetEntry ()
 (~~~>) (TargetEntry { targetexpr, targetresname })
@@ -124,6 +131,10 @@ validateExpr op = let
   = do
     when (null varTable) $ logError $ "VAR error: varTable is empty"
     when (null varColumn) $ logError $ "VAR error: varColumn is empty"
+
+(~~>) (VALUESVAR {colPos})
+  = do
+    when (colPos <= 0) $ logError $ "VALUESVAR error: colPos invalid"
 
 (~~>) (CONST { constvalue, consttype })
   = do

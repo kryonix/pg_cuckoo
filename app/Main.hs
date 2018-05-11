@@ -398,6 +398,25 @@ unique1 = A.UNIQUE
           , A.uniqueCols = [1]
           }
 
+values1 :: A.Operator
+values1 = A.VALUESSCAN
+          { A.targetlist =
+              [ A.TargetEntry
+                { A.targetexpr = A.VALUESVAR 1
+                , A.targetresname = "a"
+                , A.resjunk = False }
+              , A.TargetEntry
+                { A.targetexpr = A.VALUESVAR 2
+                , A.targetresname = "b"
+                , A.resjunk = False }
+              ]
+          , A.qual = []
+          , A.values_list =
+              [ [ A.CONST "1" "int4", A.CONST "2" "int4"]
+              , [ A.CONST "3" "int4", A.CONST "4" "int4"]
+              ]
+        }
+
 -- access list elements safely
 (!!) :: [a] -> Int -> Maybe a
 (!!) lst idx = if idx >= length lst
@@ -430,7 +449,7 @@ checkAndGenerate authStr op = do
   putStrLn $ PP.ppShow consts'
 
   -- Infere output AST
-  let infered = generatePlan tableDataR consts' (lgTableNames consts) op
+  let infered = generatePlan tableDataR consts' (lgTableNames consts) (lgValuesScan consts) op
   
   -- Print AST structure as well as the postgres plan
   putStrLn $ PP.ppShow infered
@@ -450,4 +469,4 @@ main = do
     let cp = forceEither config
     let authStr = forceEither $ get cp "Main" "dbauth" :: String
 
-    checkAndGenerate authStr unique1
+    checkAndGenerate authStr values1

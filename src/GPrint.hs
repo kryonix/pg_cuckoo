@@ -14,6 +14,7 @@ This is the place where magic happens ¯\_(ツ)_/¯
              DefaultSignatures #-}
 
 module GPrint ( GPrint(..)
+              , GPrint1(..)
               ) where
 
 import GHC.Generics
@@ -68,7 +69,7 @@ instance (GPrint1 f, Datatype c) => GPrint1 (M1 D c f) where
 instance (GPrint1 f, Constructor c) => GPrint1 (M1 C c f) where
   gprint1 m@(M1 x) = case conName m of
                         "GenericPlan" -> gprint1 x
-                        c -> "{" ++ c ++ " " ++ gprint1 x ++ "}"
+                        c -> "{" ++ takeWhile (/= '_') c ++ " " ++ gprint1 x ++ "}"
 
 -- Selector name, those are gonna be our fields
 instance (GPrint1 f, Selector s) => GPrint1 (M1 S s f) where

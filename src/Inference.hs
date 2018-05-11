@@ -27,9 +27,9 @@ import Debug.Trace
 --------------------------------------------------------------------------------
 -- Exported functions
 
-generatePlan :: TableData -> [(I.Expr, O.Expr)] -> [String] -> I.Operator -> O.PLANNEDSTMT
-generatePlan tableD exprs tableNames ast = let
-    (stmt, lg) = runOperSem (trPlannedStmt ast tableNames) (StateI 0) (C tableD exprs [])
+generatePlan :: TableData -> [(I.Expr, O.Expr)] -> [String] -> [I.Operator] -> I.Operator -> O.PLANNEDSTMT
+generatePlan tableD exprs tableNames valuesScan ast = let
+    (stmt, lg) = runOperSem (trPlannedStmt ast tableNames valuesScan) (StateI 0) (C tableD exprs [] [])
     res = case stmt of
             Prelude.Left str -> error $ "Inference error: " ++ str
             Prelude.Right a -> a
@@ -38,9 +38,10 @@ generatePlan tableD exprs tableNames ast = let
 --------------------------------------------------------------------------------
 -- READER MONAD SECTION
 
-data Context = C { tableData :: TableData          -- ^ as provided by the GetTable module
-                 , exprs     :: [(I.Expr, O.Expr)]
-                 , rtables   :: [PgTable]
+data Context = C { tableData  :: TableData          -- ^ as provided by the GetTable module
+                 , exprs      :: [(I.Expr, O.Expr)]
+                 , rtables    :: [PgTable]
+                 , valueScans :: [(I.Operator, Integer)]
                  }
 
 getRTableData :: Rule () TableData
@@ -51,6 +52,9 @@ getExprList () = lift $ asks exprs
 
 getRTables :: Rule () [PgTable]
 getRTables () = lift $ asks rtables
+
+getValueScans :: Rule () [(I.Operator, Integer)]
+getValueScans () = lift $ asks valueScans
 
 getRTableRow :: Rule (TableData -> Tbl.Table, Table -> [Row]) [Row]
 getRTableRow (tbl, idx) = do
@@ -99,17 +103,27 @@ type Rule a b = a -> OperSem StateI Context b Log
 -- | Two parameter rule
 type Rule2 a b c = a -> b -> OperSem StateI Context c Log
 
+-- | Three parameter rule
+type Rule3 a b c d = a -> b -> c -> OperSem StateI Context d Log
+
 --------------------------------------------------------------------------------
 -- Inference rules
 
-trPlannedStmt :: Rule2 I.Operator [String] O.PLANNEDSTMT
-trPlannedStmt op tbls = do
+trPlannedStmt :: Rule3 I.Operator [String] [I.Operator] O.PLANNEDSTMT
+trPlannedStmt op tbls valuesScan = do
   tables <- mapM accessPgClass tbls
   context <- lift $ ask
-  let context' = const $ context {rtables=tables}
+
+  let numTables = length tbls
+  let context' = const $ context { rtables=tables
+                                 , valueScans= map (\(a, b) -> (a, fromIntegral b)) 
+                                                $ zip valuesScan [numTables..numTables+(length valuesScan)] }
   res <- local context' $ trOperator op
 
-  let rtable = O.List $ map pgTableToRTE tables
+  let rte    = map pgTableToRTE tables
+  let values = map valuesToRTE valuesScan
+  let rtable = O.List $ rte ++ values
+
   return $ O.defaultPlannedStmt { O.planTree = res, O.rtable=rtable }
 
 pgTableToRTE :: PgTable -> O.RangeEx
@@ -138,6 +152,30 @@ pgTableToRTE t = O.RTE
     oid = tOID t
     relkind = tKind t
 
+valuesToRTE :: I.Operator -> O.RangeEx
+valuesToRTE (I.VALUESSCAN {I.targetlist}) = O.RTE_VALUES
+                  { O.alias = Nothing
+                  , O.eref  = erefA
+                  , O.rtekind = 5
+                  , O.values_lists = O.Null
+                  , O.coltypes = O.Null
+                  , O.coltypmods = O.Null
+                  , O.colcollations = O.Null
+                  , O.lateral = O.PgBool False
+                  , O.inh = O.PgBool False
+                  , O.inFromCl = O.PgBool True
+                  , O.requiredPerms = 2
+                  , O.checkAsUser = 0
+                  , O.selectedCols  = O.Bitmapset []
+                  , O.insertedCols  = O.Bitmapset []
+                  , O.updatedCols   = O.Bitmapset []
+                  , O.securityQuals = O.Null
+                  }
+  where
+    colnum = length $ targetlist
+    erefA = O.Alias { O.aliasname = "VALUES"
+                    , O.colnames  = O.List $ ["column"++show x | x <- [1..colnum]]
+                    }
 
 
 trOperator :: Rule I.Operator O.Plan
@@ -369,6 +407,53 @@ trOperator (I.UNIQUE {I.operator, I.uniqueCols})
               , O.uniqColIdx = O.PlainList uniqueCols
               , O.uniqOperators = O.PlainList ops
               }
+
+trOperator s@(I.VALUESSCAN {I.targetlist, I.qual, I.values_list})
+  = do
+    qual'       <- mapM trExpr qual
+    values_list' <- mapM (mapM trExpr) values_list
+
+    targetlist' <- forM (zip targetlist [1..]) 
+                    $ \x -> do
+                      let (e, n) = x
+                      case e of
+                        (I.TargetEntry
+                          { I.targetexpr = I.VALUESVAR {I.colPos}
+                          , I.targetresname
+                          , I.resjunk
+                          }) -> do
+                                let expr' = O.VAR
+                                            { O.varno = n
+                                            , O.varattno = colPos
+                                            , O.vartype  = getExprType $ (head values_list') !! (fromIntegral colPos-1)
+                                            , O.vartypmod = -1
+                                            , O.varcollid = 0
+                                            , O.varlevelsup = 0
+                                            , O.varnoold = n
+                                            , O.varoattno = colPos
+                                            , O.location = -1 }
+                                return $ (O.TARGETENTRY
+                                          { O.expr = expr'
+                                          , O.resno = n
+                                          , O.resname = Just targetresname
+                                          , O.ressortgroupref = n
+                                          , O.resorigcol = 0
+                                          , O.resorigtbl = 0
+                                          , O.resjunk = O.PgBool resjunk
+                                          })
+                        _ -> trTargetEntry (e, n)
+
+    vscans <- getValueScans ()
+    let rel:_ = filter ((==s) . fst) vscans
+    let relid = snd rel
+
+    return $ O.VALUESSCAN
+              { O.genericPlan = O.defaultPlan { O.targetlist = O.List targetlist'
+                                              , O.qual = O.List qual' }
+              , O.scanrelid = relid
+              , O.values_list = O.List $ map O.List values_list'
+              }
+
 
 -- | Takes a list of targetentries and a name to generate a fake table
 -- This table is used for VAR "{INNER,OUTER}_VAR" references.

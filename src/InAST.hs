@@ -55,6 +55,11 @@ data Operator = SEQSCAN
                 { operator   :: Operator
                 , uniqueCols :: [Integer]
                 }
+              | VALUESSCAN
+                { targetlist  :: [TargetEntry]
+                , qual        :: [Expr]
+                , values_list :: [[Expr]]
+                }
     deriving(Eq, Show)
 
 
@@ -93,6 +98,8 @@ data Expr = VAR
             { varTable  :: String
             , varColumn :: String
             }
+          | VALUESVAR
+            { colPos :: Integer }
           | CONST
             { constvalue :: String
             , consttype  :: String

@@ -263,17 +263,22 @@ data Plan = RESULT
           | MATERIAL
             { genericPlan :: GenericPlan }
           | NESTLOOP
-            { genericPlan :: GenericPlan
-            , jointype    :: Integer
+            { genericPlan  :: GenericPlan
+            , jointype     :: Integer
             , inner_unique :: PgBool
             , joinquals    :: List Expr
             , nestParams   :: List NestLoopParam
             }
           | UNIQUE
-            { genericPlan :: GenericPlan
-            , numCols     :: Integer
-            , uniqColIdx  :: PlainList Integer
+            { genericPlan   :: GenericPlan
+            , numCols       :: Integer
+            , uniqColIdx    :: PlainList Integer
             , uniqOperators :: PlainList Integer
+            }
+          | VALUESSCAN
+            { genericPlan :: GenericPlan
+            , scanrelid   :: Integer
+            , values_list :: List (List Expr)
             }
     deriving (Eq, Show, Generic, GPrint)
 
@@ -295,6 +300,24 @@ data RangeEx = RTE
                 , selectedCols  :: Bitmapset
                 , insertedCols  :: Bitmapset -- Const []
                 , updatedCols   :: Bitmapset -- Const []
+                , securityQuals :: Null
+                }
+             | RTE_VALUES
+                { alias         :: Maybe Alias
+                , eref          :: Alias
+                , rtekind       :: Integer
+                , values_lists  :: Null
+                , coltypes      :: Null
+                , coltypmods    :: Null
+                , colcollations :: Null
+                , lateral       :: PgBool
+                , inh           :: PgBool
+                , inFromCl      :: PgBool
+                , requiredPerms :: Integer
+                , checkAsUser   :: Integer
+                , selectedCols  :: Bitmapset
+                , insertedCols  :: Bitmapset
+                , updatedCols   :: Bitmapset
                 , securityQuals :: Null
                 }
     deriving (Eq, Show, Generic, GPrint)
