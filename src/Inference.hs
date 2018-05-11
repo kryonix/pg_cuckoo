@@ -190,6 +190,27 @@ trOperator n@(I.RESULT { I.targetlist=targetlist, I.resconstantqual})
 
     return $ O.RESULT (O.defaultPlan {O.targetlist=O.List targetlist'}) qual'
 
+trOperator n@(I.PROJECTSET { I.targetlist, I.operator })
+  = do
+    operator' <- trOperator operator
+    context   <- lift $ ask
+    -- OUTER_PLAN = first of appendplans
+    -- Generate a fake table with fake columns.
+    -- We need this to perform inference of VAR, referencing
+    -- sub-operators.
+    let fakeTable = createFakeTable "OUTER_VAR" (O.targetlist $ O.genericPlan operator')
+    -- Get rid of existing fake-tables (maybe not required?)
+    let rtablesC = dropWhile (\(PgTable {tOID}) -> tOID == -1) $ rtables context
+    let context' = context {rtables=fakeTable:rtablesC}
+
+    targetlist' <- local (const context') $ mapM trTargetEntry $ zip targetlist [1..]
+
+    return $ O.PROJECTSET
+              { O.genericPlan = O.defaultPlan
+                                  { O.targetlist = O.List targetlist'
+                                  , O.lefttree   = Just operator' }
+              }
+
 trOperator n@(I.SEQSCAN { I.targetlist, I.qual, I.scanrelation })
   = do
     targetlist' <- mapM trTargetEntry $ zip targetlist [1..]
@@ -568,8 +589,19 @@ trExpr (I.VAR { I.varTable, I.varColumn })
 
 trExpr n@(I.FUNCEXPR { I.funcname, I.funcargs })
   = do
-    -- Try to find function in pg_proc by name
-    procrow <- getRTableRow (pg_proc, findRow "proname" funcname)
+    funcargs' <- mapM trExpr funcargs
+
+    -- Type check
+    let argTypes = map getExprType funcargs'
+
+    -- Get tables from context, we have to do it that way instead of via
+    -- findRow, because we need to perform a search using multiple qualifications.
+    td <- getRTableData ()
+    let table = pg_proc td
+    -- Try to find function in pg_operator by name and argument types
+    let procrow = filter (\x -> x M.! "proname" == (DB.toSql funcname)
+                             && x M.! "pronargs" == (DB.toSql (length funcargs))) table
+
     -- Error if the function does not exist
     when (null procrow) $ error $ "FUNCEXPR: function " ++ funcname ++ " not found."
     -- Extract all information we need
@@ -597,11 +629,6 @@ trExpr n@(I.FUNCEXPR { I.funcname, I.funcargs })
     let proallargtypes' = map TR.readMaybe $ words proallargtypes :: [Maybe Integer]
     unless (all isJust proallargtypes') $ error $ "getProcData error while reading proallargtypes: " ++ show procrow
     let proallargtypesSplit = catMaybes proallargtypes'
-
-    funcargs' <- mapM trExpr funcargs
-
-    -- Type check
-    let argTypes = map getExprType funcargs'
 
     -- Check which (if any) argument types do not match.
     -- Used for helpful error message

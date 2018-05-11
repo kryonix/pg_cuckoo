@@ -21,6 +21,10 @@ data Operator = SEQSCAN
                 { targetlist      :: [TargetEntry]
                 , resconstantqual :: Maybe Expr
                 }
+              | PROJECTSET
+                { targetlist :: [TargetEntry]
+                , operator   :: Operator
+                }
               | LIMIT
                 { operator    :: Operator
                 , limitOffset :: Maybe Expr

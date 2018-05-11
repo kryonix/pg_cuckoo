@@ -68,6 +68,11 @@ validateExpr op = let
     mapM_ (~~~>) targetlist
     mapM_ (~~>) resconstantqual
 
+(~>) (PROJECTSET { targetlist, operator })
+  = do
+    mapM_ (~~~>) targetlist
+    (~>) operator
+
 (~>) (LIMIT { operator, limitOffset, limitCount })
   = do
     (~>) operator

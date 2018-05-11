@@ -417,6 +417,29 @@ values1 = A.VALUESSCAN
               ]
         }
 
+projectset1 :: A.Operator
+projectset1 = A.PROJECTSET
+              { A.targetlist =
+                  [ A.TargetEntry
+                    { A.targetexpr =
+                        A.FUNCEXPR
+                        { A.funcname = "generate_series"
+                        , A.funcargs =
+                            [ A.CONST "1" "int4"
+                            , A.CONST "10" "int4"
+                            ]
+                        }
+                    , A.targetresname = "value"
+                    , A.resjunk = False
+                    }
+                  ]
+              , A.operator =
+                  A.RESULT
+                  { A.targetlist = []
+                  , A.resconstantqual = Nothing
+                  }
+              }
+
 -- access list elements safely
 (!!) :: [a] -> Int -> Maybe a
 (!!) lst idx = if idx >= length lst
@@ -469,4 +492,4 @@ main = do
     let cp = forceEither config
     let authStr = forceEither $ get cp "Main" "dbauth" :: String
 
-    checkAndGenerate authStr values1
+    checkAndGenerate authStr projectset1
