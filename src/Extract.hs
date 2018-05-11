@@ -79,6 +79,11 @@ extract op = let
     mapM_ (~~~>) targetlist
     mapM_ (~>) appendplans
 
+(~>) (MERGEAPPEND { targetlist, mergeplans })
+  = do
+    mapM_ (~~~>) targetlist
+    mapM_ (~>) mergeplans
+
 (~>) (AGG {targetlist, operator})
   = do
     mapM_ (~~~>) targetlist

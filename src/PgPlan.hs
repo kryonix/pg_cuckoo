@@ -248,6 +248,16 @@ data Plan = RESULT
             , partitioned_rels :: Null
             , appendplans :: List Plan
             }
+          | MERGEAPPEND
+            { genericPlan      :: GenericPlan
+            , partitioned_rels :: Null
+            , mergeplans       :: List Plan
+            , numCols          :: Integer
+            , sortColIdx       :: PlainList Integer
+            , sortOperators    :: PlainList Integer
+            , collations       :: PlainList Integer
+            , nullsFirst       :: PlainList PgBool
+            }
           | AGG
             { genericPlan  :: GenericPlan
             , aggstrategy  :: Integer           -- ^ basic strategy 0: AGG_PLAN, 1: AGG_SORTED, 2: AGG_HASHED, 3: AGG_MIXED

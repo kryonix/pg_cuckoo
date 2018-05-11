@@ -95,6 +95,15 @@ validateExpr op = let
       $ logError $ "APPEND: no appendplans specified"
     mapM_ (~>) appendplans
 
+(~>) (MERGEAPPEND { targetlist, mergeplans, sortCols })
+  = do
+    when (null mergeplans)
+      $ logError $ "MERGEAPPEND: no mergeplans specified"
+    when (null sortCols)
+      $ logError $ "MERGEAPPEND: no sortCols specified"
+    mapM_ (~~~>) targetlist
+    mapM_ (~>) mergeplans
+
 (~>) (AGG {targetlist, operator})
   = do
     mapM_ (~~~>) targetlist

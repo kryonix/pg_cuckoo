@@ -296,6 +296,48 @@ trOperator (I.APPEND {I.targetlist, I.appendplans})
               , O.appendplans = O.List appendplans'
               }
 
+trOperator (I.MERGEAPPEND { I.targetlist, I.mergeplans, I.sortCols })
+  = do
+    context <- lift $ ask
+    mergeplans' <- mapM trOperator mergeplans
+
+    -- OUTER_PLAN = first of appendplans
+    -- Generate a fake table with fake columns.
+    -- We need this to perform inference of VAR, referencing
+    -- sub-operators.
+    let fakeTable = createFakeTable "OUTER_VAR" (O.targetlist $ O.genericPlan (head mergeplans'))
+    -- Get rid of existing fake-tables (maybe not required?)
+    let rtablesC = dropWhile (\(PgTable {tOID}) -> tOID == -1) $ rtables context
+    let context' = context {rtables=fakeTable:rtablesC}
+
+    targetlist' <- local (const context') $ mapM trTargetEntry $ zip targetlist [1..]
+
+    let numCols = length sortCols
+
+    when (length targetlist' < numCols)
+      $ error $ "SORT: more sortCols than targetlist entries defined."
+
+    let collations = O.PlainList $ replicate numCols 0
+    let nullsFirst = O.PlainList $ map (O.PgBool . I.sortNullsFirst) sortCols
+
+    opnos <- mapM (trSortEx targetlist') sortCols
+
+    when (null opnos) $ error "no opnos found"
+
+    let sortOperators = O.PlainList $ map O.sortop opnos
+    let sortColIdx    = O.PlainList $ map I.sortTarget sortCols
+
+    return $ O.MERGEAPPEND
+              { O.genericPlan = (O.defaultPlan { O.targetlist = O.List targetlist' })
+              , O.partitioned_rels = O.Null
+              , O.mergeplans = O.List mergeplans'
+              , O.numCols = fromIntegral numCols
+              , O.sortColIdx = sortColIdx
+              , O.sortOperators = sortOperators
+              , O.collations = collations
+              , O.nullsFirst = nullsFirst
+              }
+
 trOperator (I.AGG {I.targetlist, I.operator, I.groupCols})
   = do
     context <- lift $ ask

@@ -440,6 +440,44 @@ projectset1 = A.PROJECTSET
                   }
               }
 
+projectset2 :: A.Operator
+projectset2 = A.PROJECTSET
+              { A.targetlist =
+                  [ A.TargetEntry
+                    { A.targetexpr =
+                        A.FUNCEXPR
+                        { A.funcname = "generate_series"
+                        , A.funcargs =
+                            [ A.CONST "10" "int4"
+                            , A.CONST "1" "int4"
+                            , A.CONST "-1" "int4"
+                            ]
+                        }
+                    , A.targetresname = "value"
+                    , A.resjunk = False
+                    }
+                  ]
+              , A.operator =
+                  A.RESULT
+                  { A.targetlist = []
+                  , A.resconstantqual = Nothing
+                  }
+              }
+
+mergeappend1 :: A.Operator
+mergeappend1 = A.MERGEAPPEND
+                { A.targetlist =
+                  [ A.TargetEntry
+                    { A.targetexpr = A.VAR "OUTER_VAR" "value"
+                    , A.targetresname = "value"
+                    , A.resjunk = False
+                    }
+                  ]
+                , A.mergeplans = [projectset1, projectset2]
+                , A.sortCols =
+                  [ A.SortEx { A.sortTarget = 1, A.sortASC = True, A.sortNullsFirst = False } ]
+                }
+
 -- access list elements safely
 (!!) :: [a] -> Int -> Maybe a
 (!!) lst idx = if idx >= length lst
@@ -492,4 +530,4 @@ main = do
     let cp = forceEither config
     let authStr = forceEither $ get cp "Main" "dbauth" :: String
 
-    checkAndGenerate authStr projectset1
+    checkAndGenerate authStr mergeappend1

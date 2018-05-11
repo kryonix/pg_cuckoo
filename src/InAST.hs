@@ -39,6 +39,11 @@ data Operator = SEQSCAN
                 { targetlist  :: [TargetEntry]
                 , appendplans :: [Operator]
                 }
+              | MERGEAPPEND
+                { targetlist  :: [TargetEntry]
+                , mergeplans :: [Operator]
+                , sortCols    :: [SortEx]
+                }
               | AGG
                 { targetlist  :: [TargetEntry]
                 , operator    :: Operator
