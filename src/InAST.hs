@@ -81,6 +81,22 @@ data Operator = SEQSCAN
                 , qual        :: [Expr]
                 , values_list :: [[Expr]]
                 }
+              | HASH
+                { targetlist :: [TargetEntry]
+                , qual       :: [Expr]
+                , operator   :: Operator
+                , skewTable  :: String
+                , skewColumn :: Integer
+                }
+              | HASHJOIN
+                { targetlist   :: [TargetEntry]
+                , joinType     :: JoinType
+                , inner_unique :: Bool
+                , joinquals    :: [Expr]
+                , hashclauses  :: [Expr] -- OpExprs?
+                , lefttree     :: Operator
+                , righttree    :: Operator -- Must be HASH
+                }
     deriving(Eq, Show)
 
 

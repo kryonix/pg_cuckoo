@@ -122,6 +122,21 @@ extract op = let
     mapM_ (~~>) qual
     mapM_ (mapM_ (~~>)) values_list
 
+(~>) (HASH {targetlist, qual, operator, skewTable})
+  = do
+    logTable skewTable
+    mapM_ (~~~>) targetlist
+    mapM_ (~~>) qual
+    (~>) operator
+
+(~>) (HASHJOIN {targetlist, joinquals, hashclauses, lefttree, righttree})
+  = do
+    mapM_ (~~~>) targetlist
+    mapM_ (~~>) joinquals
+    mapM_ (~~>) hashclauses
+    (~>) lefttree
+    (~>) righttree
+
 -- | TargetEntry extract
 (~~~>) :: Rule I.TargetEntry ()
 (~~~>) (I.TargetEntry { targetexpr }) = (~~>) targetexpr

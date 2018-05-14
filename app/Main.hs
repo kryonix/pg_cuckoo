@@ -525,6 +525,87 @@ group1 = A.GROUP
           , A.groupCols = [1]
           }
 
+hashjoin1 :: A.Operator
+hashjoin1 = A.HASHJOIN
+            { A.targetlist =
+              [ A.TargetEntry
+                { A.targetexpr = A.VAR "OUTER_VAR" "a"
+                , A.targetresname = "a"
+                , A.resjunk = False
+                }
+              , A.TargetEntry
+                { A.targetexpr = A.VAR "OUTER_VAR" "b"
+                , A.targetresname = "b"
+                , A.resjunk = False
+                }
+              ]
+            , A.joinType = A.INNER
+            , A.inner_unique = True
+            , A.joinquals = []
+            , A.hashclauses =
+              [ A.OPEXPR
+                { A.oprname = "="
+                , A.oprargs =
+                  [ A.VAR "OUTER_VAR" "a"
+                  , A.VAR "INNER_VAR" "a"
+                  ]
+                }
+              ]
+            , A.lefttree =
+              A.SEQSCAN
+              { A.targetlist =
+                [ A.TargetEntry
+                  { A.targetexpr = A.VAR "grp" "a"
+                  , A.targetresname = "a"
+                  , A.resjunk = False
+                  }
+                , A.TargetEntry
+                  { A.targetexpr = A.VAR "grp" "b"
+                  , A.targetresname = "b"
+                  , A.resjunk = False
+                  }
+                ]
+              , A.qual = []
+              , A.scanrelation = "grp"
+              }
+            , A.righttree =
+              A.HASH
+              { A.targetlist =
+                [ A.TargetEntry
+                  { A.targetexpr = A.VAR "OUTER_VAR" "a"
+                  , A.targetresname = "a"
+                  , A.resjunk = False
+                  }
+                ]
+              , A.qual = []
+              , A.operator =
+                A.AGG
+                { A.targetlist =
+                  [ A.TargetEntry
+                    { A.targetexpr = A.VAR "OUTER_VAR" "a"
+                    , A.targetresname = "a"
+                    , A.resjunk = False
+                    }
+                  ]
+                , A.operator =
+                  A.SEQSCAN
+                  { A.targetlist =
+                    [ A.TargetEntry
+                      { A.targetexpr = A.VAR "s" "a"
+                      , A.targetresname = "a"
+                      , A.resjunk = False
+                      }
+                    ]
+                  , A.qual = []
+                  , A.scanrelation = "s"
+                  }
+                , A.groupCols = [1]
+                }
+              , A.skewTable = "grp"
+              , A.skewColumn = 1
+              }
+            }
+
 -- access list elements safely
 (!!) :: [a] -> Int -> Maybe a
 (!!) lst idx = if idx >= length lst
@@ -562,7 +643,9 @@ checkAndGenerate authStr op = do
   -- Print AST structure as well as the postgres plan
   putStrLn $ PP.ppShow infered
   let pgplan = gprint infered
-  putStrLn $ pgplan
+  putStrLn $ "Explain: "
+  putStrLn $ "select _pq_plan_explain('" ++ pgplan ++ "');"
+  putStrLn $ "Execute:"
   putStrLn $ "select _pq_plan_deserialize('" ++ pgplan ++ "');"
 
 
@@ -577,4 +660,4 @@ main = do
     let cp = forceEither config
     let authStr = forceEither $ get cp "Main" "dbauth" :: String
 
-    checkAndGenerate authStr group1
+    checkAndGenerate authStr hashjoin1

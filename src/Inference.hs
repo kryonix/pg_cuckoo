@@ -630,6 +630,76 @@ trOperator s@(I.VALUESSCAN {I.targetlist, I.qual, I.values_list})
               , O.values_list = O.List $ map O.List values_list'
               }
 
+trOperator s@(I.HASH {I.targetlist, I.qual, I.operator, I.skewTable, I.skewColumn})
+  = do
+    context <- lift $ ask
+    --rtables <- getRTables ()
+    operator' <- trOperator operator
+
+    -- OUTER_PLAN = first of appendplans
+    -- Generate a fake table with fake columns.
+    -- We need this to perform inference of VAR, referencing
+    -- sub-operators.
+    let fakeTable = createFakeTable "OUTER_VAR" (O.targetlist $ O.genericPlan operator')
+    -- Get rid of existing fake-tables (maybe not required?)
+    let rtablesC = dropWhile (\(PgTable {tOID}) -> tOID == -1) $ rtables context
+    let context' = context {rtables=fakeTable:rtablesC}
+
+    targetlist' <- local (const context') $ mapM trTargetEntry $ zip targetlist [1..]
+
+    qual' <- local (const context') $ mapM trExpr qual
+
+    let rtable:_ = filter (\x -> tName x == skewTable) rtablesC
+
+    return $ O.HASH
+              { O.genericPlan = O.defaultPlan
+                                { O.targetlist = O.List targetlist'
+                                , O.qual       = O.List qual'
+                                , O.lefttree   = Just operator'
+                                }
+              , O.skewTable = tOID rtable
+              , O.skewColumn = skewColumn
+              , O.skewInherit = O.PgBool False
+              }
+
+trOperator s@(I.HASHJOIN {I.targetlist, I.joinType, I.inner_unique, I.joinquals, I.hashclauses, I.lefttree, I.righttree})
+  = do
+    lefttree' <- trOperator lefttree
+    righttree' <- trOperator righttree
+
+    context <- lift $ ask
+
+    let fakeOuter = createFakeTable "OUTER_VAR" (O.targetlist $ O.genericPlan lefttree')
+    let fakeInner = createFakeTable "INNER_VAR" (O.targetlist $ O.genericPlan righttree')
+    let fakeTables = [fakeOuter, fakeInner]
+
+    -- Get rid of existing fake-tables (maybe not required?)
+    let rtablesC = dropWhile (\(PgTable {tOID}) -> tOID == -1) $ rtables context
+    let context' = context {rtables=fakeTables++rtablesC}
+
+    targetlist' <- local (const context') $ mapM trTargetEntry $ zip targetlist [1..]
+    hashclauses'  <- local (const context') $ mapM trExpr hashclauses
+    joinquals'  <- local (const context') $ mapM trExpr joinquals
+
+    let joinType' = case joinType of
+                  I.INNER -> 0
+                  I.LEFT  -> 1
+                  I.FULL  -> 2
+                  I.RIGHT -> 3
+                  I.SEMI  -> 4
+                  I.ANTI  -> 5
+
+    return $ O.HASHJOIN
+              { O.genericPlan = O.defaultPlan
+                                  { O.targetlist = O.List targetlist'
+                                  , O.lefttree = Just lefttree'
+                                  , O.righttree = Just righttree'
+                                  }
+              , O.jointype = joinType'
+              , O.inner_unique = O.PgBool inner_unique
+              , O.joinqual = O.List joinquals'
+              , O.hashclauses = O.List hashclauses'
+              }
 
 -- | Takes a list of targetentries and a name to generate a fake table
 -- This table is used for VAR "{INNER,OUTER}_VAR" references.

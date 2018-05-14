@@ -147,6 +147,31 @@ validateExpr op = let
     mapM_ (~~>) qual
     mapM_ (mapM_ (~~>)) values_list
 
+(~>) (HASH {targetlist, qual, operator, skewTable})
+  = do
+    when (null skewTable)
+      $ logError "HASH: no skewTable specified"
+    mapM_ (~~>) qual
+    mapM_ (~~~>) targetlist
+    (~>) operator
+
+(~>) (HASHJOIN {targetlist, joinquals, hashclauses, lefttree, righttree})
+  = do
+    when (null hashclauses)
+      $ logError "HASHJOIN: no hashclauses specified"
+
+    mapM_ (~~~>) targetlist
+    mapM_ (~~>) joinquals
+    mapM_ (~~>) hashclauses
+    (~>) lefttree
+
+    case righttree of
+      (HASH {}) -> (~>) righttree
+      _         -> do
+                    logError
+                      $ "HASHJOIN: righttree is not HASH"
+                    (~>) righttree
+
 -- | TargetEntry validator
 (~~~>) :: Rule I.TargetEntry ()
 (~~~>) (TargetEntry { targetexpr, targetresname })

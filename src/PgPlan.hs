@@ -302,6 +302,19 @@ data Plan = RESULT
             , scanrelid   :: Integer
             , values_list :: List (List Expr)
             }
+          | HASH
+            { genericPlan :: GenericPlan
+            , skewTable   :: Integer
+            , skewColumn  :: Integer
+            , skewInherit :: PgBool
+            }
+          | HASHJOIN
+            { genericPlan  :: GenericPlan
+            , jointype     :: Integer
+            , inner_unique :: PgBool
+            , joinqual     :: List Expr
+            , hashclauses  :: List Expr
+            }
     deriving (Eq, Show, Generic, GPrint)
 
 data NestLoopParam = FIXME Null
