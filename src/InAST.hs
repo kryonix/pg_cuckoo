@@ -50,6 +50,24 @@ data Operator = SEQSCAN
                 , mergeplans :: [Operator]
                 , sortCols    :: [SortEx]
                 }
+              | INDEXSCAN
+                { targetlist    :: [TargetEntry]
+                , qual          :: [Expr]
+                , indexqual     :: [Expr]
+                , indexorderby  :: [SortEx]
+                , indexorderasc :: Bool
+                , indexname     :: String
+                , scanrelation  :: String
+                }
+              | INDEXONLYSCAN
+                { targetlist    :: [TargetEntry]
+                , qual          :: [Expr]
+                , indexqual     :: [Expr]
+                , indexorderby  :: [SortEx]
+                , indexorderasc :: Bool
+                , indexname     :: String
+                , scanrelation  :: String
+                }
               | AGG
                 { targetlist  :: [TargetEntry]
                 , operator    :: Operator

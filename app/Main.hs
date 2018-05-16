@@ -606,6 +606,52 @@ hashjoin1 = A.HASHJOIN
               }
             }
 
+indexscan1 :: A.Operator
+indexscan1 = A.INDEXSCAN
+            { A.targetlist =
+              [ A.TargetEntry
+                { A.targetexpr = A.VAR "indexed" "c"
+                , A.targetresname = "c"
+                , A.resjunk = False
+                }
+              , A.TargetEntry
+                { A.targetexpr = A.VAR "indexed" "a"
+                , A.targetresname = "a"
+                , A.resjunk = True
+                }
+              ]
+            , A.qual = []
+            , A.indexqual = []
+            , A.indexorderby = []
+            , A.indexorderasc = True
+            , A.indexname = "indexed_pkey"
+            , A.scanrelation = "indexed"
+            }
+
+indexonlyscan1 :: A.Operator
+indexonlyscan1 = A.INDEXONLYSCAN
+                { A.targetlist =
+                  [ A.TargetEntry
+                    { A.targetexpr = A.VAR "indexed_foo" "a"
+                    , A.targetresname = "a"
+                    , A.resjunk = False
+                    }
+                  ]
+                , A.qual = []
+                , A.indexqual =
+                  [ A.OPEXPR
+                    { A.oprname = "="
+                    , A.oprargs =
+                      [ A.VAR "indexed_foo" "a"
+                      , A.CONST "4" "int4" ]
+                    }
+                  ]
+                , A.indexorderby = []
+                , A.indexorderasc = True
+                , A.indexname = "indexed_foo"
+                , A.scanrelation = "indexed"
+                }
+
 -- access list elements safely
 (!!) :: [a] -> Int -> Maybe a
 (!!) lst idx = if idx >= length lst
@@ -660,4 +706,4 @@ main = do
     let cp = forceEither config
     let authStr = forceEither $ get cp "Main" "dbauth" :: String
 
-    checkAndGenerate authStr hashjoin1
+    checkAndGenerate authStr indexonlyscan1

@@ -112,6 +112,31 @@ validateExpr op = let
     mapM_ (~~~>) targetlist
     mapM_ (~>) mergeplans
 
+(~>) (INDEXSCAN {targetlist, qual, indexqual, indexname, scanrelation})
+  = do
+    when (null indexname)
+      $ logError "INDEXSCAN: indexname not specified"
+
+    when (null scanrelation)
+      $ logError $ "INDEXSCAN error: scanrelation is empty"
+
+    mapM_ (~~~>) targetlist
+    mapM_ (~~>) qual
+    mapM_ (~~>) indexqual
+
+(~>) (INDEXONLYSCAN {targetlist, qual, indexqual, indexname, scanrelation})
+  = do
+    when (null indexname)
+      $ logError "INDEXONLYSCAN: indexname not specified"
+
+    when (null scanrelation)
+      $ logError $ "INDEXONLYSCAN error: scanrelation is empty"
+
+    mapM_ (~~~>) targetlist
+    mapM_ (~~>) qual
+    mapM_ (~~>) indexqual
+
+
 (~>) (AGG {targetlist, operator})
   = do
     mapM_ (~~~>) targetlist

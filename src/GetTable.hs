@@ -35,6 +35,7 @@ data TableData = TableData
                , pg_class     :: Table
                , pg_attribute :: Table
                , pg_aggregate :: Table
+               , pg_indexes   :: Table
                }
     deriving (Show)
 
@@ -59,6 +60,7 @@ getTableData auth = do
     pg_class     <- getTable auth "SELECT oid, relname, relkind FROM pg_class"
     pg_attribute <- getTable auth "SELECT attrelid, attnum, atttypid, attname, attlen, atttypmod, attcollation FROM pg_attribute WHERE attnum > 0"
     pg_aggregate <- getTable auth "SELECT aggfnoid :: OID as oid, * FROM pg_aggregate"
+    pg_indexes   <- getTable auth "SELECT * FROM pg_indexes"
 
     let tOperators = tableToMap pg_operators
     let tType      = tableToMap pg_type
@@ -66,7 +68,8 @@ getTableData auth = do
     let tClass     = tableToMap pg_class
     let tAttribute = tableToMap pg_attribute
     let tAggregate = tableToMap pg_aggregate
-    return $! TableData tOperators tType tProc tClass tAttribute tAggregate
+    let tIndexes   = tableToMap pg_indexes
+    return $! TableData tOperators tType tProc tClass tAttribute tAggregate tIndexes
 
 checkPlugin :: String -> String -> IO (Either String ())
 checkPlugin auth expected = do

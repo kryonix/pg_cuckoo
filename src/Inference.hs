@@ -394,6 +394,96 @@ trOperator (I.MERGEAPPEND { I.targetlist, I.mergeplans, I.sortCols })
               , O.nullsFirst = nullsFirst
               }
 
+trOperator (I.INDEXSCAN {I.targetlist, I.qual, I.indexqual, I.indexorderby, I.indexorderasc, I.indexname, I.scanrelation})
+  = do
+    targetlist' <- mapM trTargetEntry $ zip targetlist [1..]
+    qual'       <- mapM trExpr qual
+    indexqual'  <- mapM trExpr indexqual
+
+    let indexorderdir = if indexorderasc then 1 else -1
+
+    rtables <- getRTables ()
+    let rtable:_ = filter (\x -> tName x == scanrelation) rtables
+    let (Just index) = elemIndex rtable rtables
+    let index' = fromIntegral index + 1
+
+    tbl <- accessPgClass indexname
+
+    return $ O.INDEXSCAN
+              { O.genericPlan =
+                  O.defaultPlan
+                    { O.targetlist = O.List targetlist'
+                    , O.qual       = O.List qual'
+                    }
+              , O.scanrelid = index'
+              , O.indexid   = tOID tbl
+              , O.indexqual = O.List indexqual'
+              , O.indexqualorig = O.Null
+              , O.indexorderby  = Nothing
+              , O.indexorderbyorig = O.Null
+              , O.indexorderbyops = Nothing
+              , O.indexorderdir = indexorderdir
+              }
+
+trOperator (I.INDEXONLYSCAN {I.targetlist, I.qual, I.indexqual, I.indexorderby, I.indexorderasc, I.indexname, I.scanrelation})
+  = do
+    context <- lift $ ask
+    table <- accessPgClass indexname
+
+    let context' = context {rtables=table:rtables context}
+
+    targetlist' <- local (const context') $ mapM trTargetEntry $ zip targetlist [1..]
+    qual'       <- local (const context') $ mapM trExpr qual
+    indexqual'  <- local (const context') $ mapM trExpr indexqual
+
+    let indexorderdir = if indexorderasc then 1 else -1
+
+    rtables <- getRTables ()
+    let rtable:_ = filter (\x -> tName x == scanrelation) rtables
+    let (Just index) = elemIndex rtable rtables
+    let index' = fromIntegral index + 1
+    let origtbl = tOID rtable
+
+    tbl <- accessPgClass indexname
+    let indexColumns = zip [1..] (tCols tbl)
+
+    -- Have to infer '*' from index.
+    let indextlist = [ O.TARGETENTRY
+                      { O.expr =
+                        O.VAR
+                        { O.varno = index'
+                        , O.varattno = n
+                        , O.vartype = cAtttypid e
+                        , O.vartypmod = cAtttypmod e
+                        , O.varcollid = cAttcollation e
+                        , O.varlevelsup = 0
+                        , O.varnoold = 0
+                        , O.varoattno = 0
+                        , O.location = -1
+                        }
+                      , O.resno = n
+                      , O.resname = Nothing
+                      , O.ressortgroupref = 0
+                      , O.resorigtbl = 0
+                      , O.resorigcol = 0
+                      , O.resjunk = O.PgBool False }
+                    | (n, e) <- indexColumns
+                    ]
+
+    return $ O.INDEXONLYSCAN
+              { O.genericPlan =
+                  O.defaultPlan
+                    { O.targetlist = O.List $ map (\x -> x {O.resorigtbl=origtbl}) targetlist'
+                    , O.qual       = O.List qual'
+                    }
+              , O.scanrelid = index'
+              , O.indexid   = tOID tbl
+              , O.indexqual = O.List indexqual'
+              , O.indexorderby  = Nothing
+              , O.indextlist = O.List indextlist
+              , O.indexorderdir = indexorderdir
+              }
+
 trOperator (I.AGG {I.targetlist, I.operator, I.groupCols})
   = do
     context <- lift $ ask
@@ -792,13 +882,15 @@ trExpr (I.VAR { I.varTable, I.varColumn })
     rtables <- getRTables ()
     let rtable:_ = filter (\x -> tName x == varTable) rtables
     let column:_ = filter (\x -> cAttname x == varColumn) $ tCols rtable
+    let tableKind = tKind rtable
     -- Calculate the index of the table in rtable of PlannedStmt
     let (Just index) = elemIndex rtable rtables
     -- Postgres enumerates these indizes from 1, so we have to increment the value
     let index' = case varTable of
                   "INNER_VAR" -> 65000
                   "OUTER_VAR" -> 65001
-                  _ -> fromIntegral index + 1
+                  "INDEX_VAR" -> 65002
+                  _ -> if tableKind == "i" then 65002 else fromIntegral index + 1
 
     return $ O.VAR
               { O.varno       = index'
@@ -1048,7 +1140,7 @@ accessPgClass :: Rule String PgTable
 accessPgClass tableName = do
   -- Get row of table in pg_class
   classRow <- getRTableRow (pg_class, findRow "relname" tableName)
-  when (null classRow) $ error $ "accessPgClass no rows found"
+  when (null classRow) $ error $ "accessPgClass no rows found: " ++ tableName ++ " does not exist"
   -- Fetch relid from row
   let relid = fromSql $ head classRow M.! "oid"
   -- Fetch relkind from row

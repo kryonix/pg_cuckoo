@@ -92,6 +92,22 @@ extract op = let
     mapM_ (~~~>) targetlist
     mapM_ (~>) mergeplans
 
+(~>) i@(INDEXSCAN {targetlist, qual, indexqual, indexname, scanrelation})
+  = do
+    -- logScan i
+    logTable scanrelation
+    mapM_ (~~~>) targetlist
+    mapM_ (~~>) qual
+    mapM_ (~~>) indexqual
+
+(~>) i@(INDEXONLYSCAN {targetlist, qual, indexqual, indexname, scanrelation})
+  = do
+    -- logScan i
+    logTable scanrelation
+    mapM_ (~~~>) targetlist
+    mapM_ (~~>) qual
+    mapM_ (~~>) indexqual
+
 (~>) (AGG {targetlist, operator})
   = do
     mapM_ (~~~>) targetlist

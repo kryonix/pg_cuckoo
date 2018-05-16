@@ -264,6 +264,26 @@ data Plan = RESULT
             , collations       :: PlainList Integer
             , nullsFirst       :: PlainList PgBool
             }
+          | INDEXSCAN
+            { genericPlan      :: GenericPlan
+            , scanrelid        :: Integer
+            , indexid          :: Integer
+            , indexqual        :: List Expr
+            , indexqualorig    :: Null
+            , indexorderby     :: Maybe (PlainList Integer)
+            , indexorderbyorig :: Null
+            , indexorderbyops  :: Maybe (PlainList Integer)
+            , indexorderdir    :: Integer
+            }
+          | INDEXONLYSCAN
+            { genericPlan   :: GenericPlan
+            , scanrelid     :: Integer
+            , indexid       :: Integer
+            , indexqual     :: List Expr
+            , indexorderby  :: Maybe (PlainList Integer)
+            , indextlist    :: List TARGETENTRY
+            , indexorderdir :: Integer
+            }
           | AGG
             { genericPlan  :: GenericPlan
             , aggstrategy  :: Integer           -- ^ basic strategy 0: AGG_PLAN, 1: AGG_SORTED, 2: AGG_HASHED, 3: AGG_MIXED
