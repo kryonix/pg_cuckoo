@@ -1170,6 +1170,33 @@ trExpr n@(I.AGGREF {I.aggname, I.aggargs, I.aggdirectargs, I.aggorder, I.aggdist
             , O.location      = -1
             }
 
+trExpr (I.AND { I.args })
+  = do
+    args' <- mapM trExpr args
+    return $ O.BOOLEXPR
+            { O.boolop   = "and"
+            , O.args     = O.List args'
+            , O.location = -1
+            }
+
+trExpr (I.OR { I.args })
+  = do
+    args' <- mapM trExpr args
+    return $ O.BOOLEXPR
+            { O.boolop   = "or"
+            , O.args     = O.List args'
+            , O.location = -1
+            }
+
+trExpr (I.NOT { I.arg })
+  = do
+    arg' <- trExpr arg
+    return $ O.BOOLEXPR
+            { O.boolop   = "not"
+            , O.args     = O.List [arg']
+            , O.location = -1
+            }
+
 --------------------------------------------------------------------------------
 --
 

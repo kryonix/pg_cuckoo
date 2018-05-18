@@ -33,6 +33,24 @@ const1 = A.RESULT
           , A.resconstantqual = Nothing
           }
 
+const2 :: A.Operator
+const2 = A.RESULT
+          { A.targetlist =
+            [ A.TargetEntry
+              { A.targetexpr =
+                A.AND
+                { A.args =
+                  [ A.CONST "true" "bool"
+                  , A.CONST "false" "bool"
+                  ]
+                }
+              , A.targetresname = "foo"
+              , A.resjunk = False
+              }
+            ]
+          , A.resconstantqual = Nothing
+          }
+
 -- Query would be: select a as "foo", b as "bar" from grp
 seq1 :: A.Operator
 seq1 = A.SEQSCAN
@@ -747,4 +765,4 @@ main = do
     let cp = forceEither config
     let authStr = forceEither $ get cp "Main" "dbauth" :: String
 
-    checkAndGenerate authStr bitmapheapscan1
+    checkAndGenerate authStr const2

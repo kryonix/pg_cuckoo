@@ -526,6 +526,11 @@ data Expr = VAR
             , funccolcollations :: Null
             , funcparams :: Bitmapset
             }
+          | BOOLEXPR
+            { boolop   :: String
+            , args     :: List Expr
+            , location :: Integer
+            }
     deriving (Eq, Show, Generic, GPrint)
 
 data SORTGROUPCLAUSE = SORTGROUPCLAUSE

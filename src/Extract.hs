@@ -189,4 +189,8 @@ extract op = let
     mapM_ (~~>) aggdirectargs
     mapM_ (~~>) aggfilter
 
+(~~>) (AND { args }) = mapM_ (~~>) args
+(~~>) (OR { args }) = mapM_ (~~>) args
+(~~>) (NOT { arg }) = (~~>) arg
+
 (~~>) e = return ()

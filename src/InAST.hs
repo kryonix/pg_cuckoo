@@ -187,6 +187,9 @@ data Expr = VAR
             , aggfilter     :: Maybe Expr
             , aggstar       :: Bool
             }
+          | AND { args :: [Expr] }
+          | OR  { args :: [Expr] }
+          | NOT { arg  :: Expr }
     deriving (Eq, Show)
 
 data JoinType = INNER
