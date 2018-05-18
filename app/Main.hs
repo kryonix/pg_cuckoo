@@ -711,6 +711,74 @@ bitmapheapscan1 = A.BITMAPHEAPSCAN
                   , A.scanrelation = "indexed"
                   }
 
+bitmapor1 :: A.Operator
+bitmapor1 = A.BITMAPHEAPSCAN
+            { A.targetlist =
+              [ A.TargetEntry
+                { A.targetexpr = A.VAR "indexed" "a"
+                , A.targetresname = "a"
+                , A.resjunk = False
+                }
+              , A.TargetEntry
+                { A.targetexpr = A.VAR "indexed" "b"
+                , A.targetresname = "b"
+                , A.resjunk = False
+                }
+              ]
+            , A.bitmapqualorig = 
+                [ A.OR
+                  { A.args =
+                    [ A.OPEXPR
+                      { A.oprname = "="
+                      , A.oprargs =
+                        [ A.VAR "indexed" "c"
+                        , A.CONST "0.42" "numeric"
+                        ]
+                      }
+                    , A.OPEXPR
+                      { A.oprname = "="
+                      , A.oprargs =
+                        [ A.VAR "indexed" "c"
+                        , A.CONST "1.0" "numeric"
+                        ]
+                      }
+                    ]
+                  }
+                ]
+            , A.operator =
+                A.BITMAPOR
+                { A.bitmapplans =
+                  [ A.BITMAPINDEXSCAN
+                    { A.indexqual =
+                    [ A.OPEXPR
+                        { A.oprname = "="
+                        , A.oprargs =
+                        [ A.VAR "indexed_c" "c"
+                        , A.CONST "0.42" "numeric"
+                        ]
+                        }
+                    ]
+                    , A.indexname = "indexed_c"
+                    , A.scanrelation = "indexed"
+                    }
+                  , A.BITMAPINDEXSCAN
+                    { A.indexqual =
+                    [ A.OPEXPR
+                        { A.oprname = "="
+                        , A.oprargs =
+                        [ A.VAR "indexed_c" "c"
+                        , A.CONST "1" "numeric"
+                        ]
+                        }
+                    ]
+                    , A.indexname = "indexed_c"
+                    , A.scanrelation = "indexed"
+                    }
+                  ]
+                }
+            , A.scanrelation = "indexed"
+            }
+
 -- access list elements safely
 (!!) :: [a] -> Int -> Maybe a
 (!!) lst idx = if idx >= length lst
@@ -765,4 +833,4 @@ main = do
     let cp = forceEither config
     let authStr = forceEither $ get cp "Main" "dbauth" :: String
 
-    checkAndGenerate authStr const2
+    checkAndGenerate authStr bitmapor1

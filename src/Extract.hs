@@ -92,6 +92,9 @@ extract op = let
     mapM_ (~~~>) targetlist
     mapM_ (~>) mergeplans
 
+(~>) (BITMAPAND { bitmapplans }) = mapM_ (~>) bitmapplans
+(~>) (BITMAPOR { bitmapplans }) = mapM_ (~>) bitmapplans
+
 (~>) i@(INDEXSCAN {targetlist, qual, indexqual, indexname, scanrelation})
   = do
     -- logScan i

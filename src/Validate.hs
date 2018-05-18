@@ -112,6 +112,18 @@ validateExpr op = let
     mapM_ (~~~>) targetlist
     mapM_ (~>) mergeplans
 
+(~>) (BITMAPAND {bitmapplans})
+  = do
+    when (null bitmapplans)
+      $ logError $ "BITMAPAND: no bitmapplans specified"
+    mapM_ (~>) bitmapplans
+
+(~>) (BITMAPOR {bitmapplans})
+  = do
+    when (null bitmapplans)
+      $ logError $ "BITMAPOR: no bitmapplans specified"
+    mapM_ (~>) bitmapplans
+
 (~>) (INDEXSCAN {targetlist, qual, indexqual, indexname, scanrelation})
   = do
     when (null indexname)

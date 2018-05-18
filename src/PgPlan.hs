@@ -264,6 +264,15 @@ data Plan = RESULT
             , collations       :: PlainList Integer
             , nullsFirst       :: PlainList PgBool
             }
+          | BITMAPAND
+            { genericPlan :: GenericPlan
+            , bitmapplans :: List Plan
+            }
+          | BITMAPOR
+            { genericPlan :: GenericPlan
+            , isshared    :: PgBool
+            , bitmapplans :: List Plan
+            }
           | INDEXSCAN
             { genericPlan      :: GenericPlan
             , scanrelid        :: Integer

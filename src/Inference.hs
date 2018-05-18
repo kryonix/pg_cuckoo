@@ -394,6 +394,25 @@ trOperator (I.MERGEAPPEND { I.targetlist, I.mergeplans, I.sortCols })
               , O.nullsFirst = nullsFirst
               }
 
+trOperator (I.BITMAPAND { I.bitmapplans })
+  = do
+    bitmapplans' <- mapM trOperator bitmapplans
+
+    return $ O.BITMAPAND
+              { O.genericPlan = O.defaultPlan
+              , O.bitmapplans = O.List bitmapplans'
+              }
+
+trOperator (I.BITMAPOR { I.bitmapplans })
+  = do
+    bitmapplans' <- mapM trOperator bitmapplans
+
+    return $ O.BITMAPOR
+              { O.genericPlan = O.defaultPlan
+              , O.isshared    = O.PgBool False
+              , O.bitmapplans = O.List bitmapplans'
+              }
+
 trOperator (I.INDEXSCAN {I.targetlist, I.qual, I.indexqual, I.indexorderby, I.indexorderasc, I.indexname, I.scanrelation})
   = do
     targetlist' <- mapM trTargetEntry $ zip targetlist [1..]

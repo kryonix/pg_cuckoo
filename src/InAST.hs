@@ -50,6 +50,10 @@ data Operator = SEQSCAN
                 , mergeplans :: [Operator]
                 , sortCols    :: [SortEx]
                 }
+              | BITMAPAND
+                { bitmapplans :: [Operator] }
+              | BITMAPOR
+                { bitmapplans :: [Operator] }
               | INDEXSCAN
                 { targetlist    :: [TargetEntry]
                 , qual          :: [Expr]
