@@ -868,6 +868,129 @@ subqueryscan1 = A.SUBQUERYSCAN
                     }
                 }
 
+setop1 :: A.Operator
+setop1 = A.SETOP
+        { A.targetlist =
+            [ A.TargetEntry
+                { A.targetexpr = A.VAR "OUTER_VAR" "a"
+                , A.targetresname = "a"
+                , A.resjunk = False
+                }
+            , A.TargetEntry
+                { A.targetexpr = A.VAR "OUTER_VAR" "b"
+                , A.targetresname = "b"
+                , A.resjunk = False
+                }
+            , A.TargetEntry
+                { A.targetexpr = A.VAR "OUTER_VAR" "flag"
+                , A.targetresname = "flag"
+                , A.resjunk = True
+                }
+            ]
+        , A.qual = []
+        , A.setOpCmd = A.SETOPCMD_EXCEPT
+        , A.setopStrategy = A.SETOP_HASHED
+        , A.lefttree =
+            A.APPEND
+            { A.targetlist =
+                [ A.TargetEntry
+                    { A.targetexpr = A.VAR "OUTER_VAR" "a"
+                    , A.targetresname = "a"
+                    , A.resjunk = False
+                    }
+                , A.TargetEntry
+                    { A.targetexpr = A.VAR "OUTER_VAR" "b"
+                    , A.targetresname = "b"
+                    , A.resjunk = False
+                    }
+                , A.TargetEntry
+                    { A.targetexpr = A.VAR "OUTER_VAR" "flag"
+                    , A.targetresname = "flag"
+                    , A.resjunk = False
+                    }
+                ]
+            , A.appendplans =
+                [ A.SUBQUERYSCAN
+                    { A.targetlist =
+                        [ A.TargetEntry
+                          { A.targetexpr = A.SCANVAR 1
+                          , A.targetresname = "a"
+                          , A.resjunk = False
+                          }
+                        , A.TargetEntry
+                          { A.targetexpr = A.SCANVAR 2
+                          , A.targetresname = "b"
+                          , A.resjunk = False
+                          }
+                        , A.TargetEntry
+                          { A.targetexpr = A.CONST "0" "int4"
+                          , A.targetresname = "flag"
+                          , A.resjunk = False
+                          }
+                        ]
+                    , A.qual = []
+                    , A.subplan =
+                        A.SEQSCAN
+                        { A.targetlist =
+                            [ A.TargetEntry
+                              { A.targetexpr = A.VAR "grp" "a"
+                              , A.targetresname = "a"
+                              , A.resjunk = False
+                              }
+                            , A.TargetEntry
+                              { A.targetexpr = A.VAR "grp" "b"
+                              , A.targetresname = "b"
+                              , A.resjunk = False
+                              }
+                            ]
+                        , A.qual = []
+                        , A.scanrelation = "grp"
+                        }
+                    }
+                , A.SUBQUERYSCAN
+                    { A.targetlist =
+                        [ A.TargetEntry
+                          { A.targetexpr = A.SCANVAR 1
+                          , A.targetresname = "a"
+                          , A.resjunk = False
+                          }
+                        , A.TargetEntry
+                          { A.targetexpr = A.SCANVAR 2
+                          , A.targetresname = "b"
+                          , A.resjunk = False
+                          }
+                        , A.TargetEntry
+                          { A.targetexpr = A.CONST "1" "int4"
+                          , A.targetresname = "flag"
+                          , A.resjunk = False
+                          }
+                        ]
+                    , A.qual = []
+                    , A.subplan =
+                        A.SEQSCAN
+                        { A.targetlist =
+                            [ A.TargetEntry
+                            { A.targetexpr = A.VAR "s" "a"
+                            , A.targetresname = "a"
+                            , A.resjunk = False
+                            }
+                            , A.TargetEntry
+                            { A.targetexpr = A.VAR "s" "b"
+                            , A.targetresname = "b"
+                            , A.resjunk = False
+                            }
+                            ]
+                        , A.qual = []
+                        , A.scanrelation = "s"
+                        }
+                    }
+                ]
+            }
+        , A.flagColIdx = 3
+        , A.firstFlag = 0
+        }
+
+
 -- access list elements safely
 (!!) :: [a] -> Int -> Maybe a
 (!!) lst idx = if idx >= length lst
@@ -922,4 +1045,4 @@ main = do
     let cp = forceEither config
     let authStr = forceEither $ get cp "Main" "dbauth" :: String
 
-    checkAndGenerate authStr subqueryscan1
+    checkAndGenerate authStr setop1

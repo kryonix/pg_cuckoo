@@ -186,6 +186,13 @@ extract op = let
     (~>) lefttree
     (~>) righttree
 
+(~>) (SETOP {targetlist, qual, lefttree})
+  = do
+    mapM_ (~~~>) targetlist
+    mapM_ (~~>) qual
+
+    (~>) lefttree
+
 -- | TargetEntry extract
 (~~~>) :: Rule I.TargetEntry ()
 (~~~>) (I.TargetEntry { targetexpr }) = (~~>) targetexpr

@@ -245,6 +245,13 @@ validateExpr op = let
                       $ "HASHJOIN: righttree is not HASH"
                     (~>) righttree
 
+(~>) (SETOP {targetlist, qual, lefttree})
+  = do
+    mapM_ (~~~>) targetlist
+    mapM_ (~~>) qual
+
+    (~>) lefttree
+
 -- | TargetEntry validator
 (~~~>) :: Rule I.TargetEntry ()
 (~~~>) (TargetEntry { targetexpr, targetresname })

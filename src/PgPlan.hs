@@ -374,6 +374,17 @@ data Plan = RESULT
             , joinqual     :: List Expr
             , hashclauses  :: List Expr
             }
+          | SETOP
+            { genericPlan  :: GenericPlan
+            , cmd          :: Integer
+            , strategy     :: Integer
+            , numCols      :: Integer
+            , dupColIdx    :: PlainList Integer
+            , dupOperators :: PlainList Integer
+            , flagColIdx   :: Integer
+            , firstFlag    :: Integer
+            , numGroups    :: Integer
+            }
     deriving (Eq, Show, Generic, GPrint)
 
 data NestLoopParam = FIXME Null

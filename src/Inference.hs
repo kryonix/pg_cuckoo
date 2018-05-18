@@ -994,6 +994,55 @@ trOperator s@(I.HASHJOIN {I.targetlist, I.joinType, I.inner_unique, I.joinquals,
               , O.hashclauses = O.List hashclauses'
               }
 
+trOperator (I.SETOP {I.targetlist, I.qual, I.setopStrategy, I.setOpCmd, I.lefttree, I.flagColIdx, I.firstFlag})
+  = do
+    lefttree' <- trOperator lefttree
+
+    context <- lift $ ask
+
+    let fakeOuter = createFakeTable "OUTER_VAR" (O.targetlist $ O.genericPlan lefttree')
+    let fakeTables = [fakeOuter]
+
+    -- Get rid of existing fake-tables (maybe not required?)
+    let rtablesC = dropWhile (\(PgTable {tOID}) -> tOID == -1) $ rtables context
+    let context' = context {rtables=fakeTables++rtablesC}
+
+    targetlist' <- local (const context') $ mapM trTargetEntry $ zip targetlist [1..]
+    qual'       <- local (const context') $ mapM trExpr qual
+
+    let targets = init $ map (getExprType . O.expr) $ ((\(O.List x) -> x) . O.targetlist . O.genericPlan) lefttree'
+
+    -- Try to find function in pg_operator by name and argument types
+    dupOperators <- mapM ((liftM fst) . searchOperator) $ zip targets (repeat "=")
+    let cmd = case setOpCmd of
+              I.SETOPCMD_INTERSECT     -> 0
+              I.SETOPCMD_INTERSECT_ALL -> 1
+              I.SETOPCMD_EXCEPT        -> 2
+              I.SETOPCMD_EXCEPT_ALL    -> 3
+
+    let numCols = length targets
+    let dupColIdx = [1..numCols]
+    let strategy = case setopStrategy of
+                    I.SETOP_SORTED -> 0
+                    I.SETOP_HASHED -> 1
+
+    return $ O.SETOP
+              { O.genericPlan =
+                  O.defaultPlan
+                  { O.targetlist = O.List targetlist'
+                  , O.qual = O.List qual'
+                  , O.lefttree = Just lefttree'
+                  }
+              , O.cmd = cmd
+              , O.strategy = strategy
+              , O.numCols = fromIntegral numCols
+              , O.dupColIdx = O.PlainList $ map fromIntegral dupColIdx
+              , O.dupOperators = O.PlainList dupOperators
+              , O.flagColIdx = flagColIdx
+              , O.firstFlag = firstFlag
+              , O.numGroups = 0
+              }
+
 -- | Takes a list of targetentries and a name to generate a fake table
 -- This table is used for VAR "{INNER,OUTER}_VAR" references.
 createFakeTable :: String -> (O.List O.TARGETENTRY) -> PgTable

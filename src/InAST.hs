@@ -9,6 +9,8 @@ module InAST ( Operator(..)
              , TargetEntry(..)
              , SortEx(..)
              , MergeEx(..)
+             , SetOpCmd(..)
+             , SetOpStrategy(..)
              , Expr(..)
              , JoinType(..)
              , NestLoopParam(..) ) where
@@ -147,8 +149,16 @@ data Operator = SEQSCAN
                 , lefttree     :: Operator
                 , righttree    :: Operator -- Must be HASH
                 }
+              | SETOP
+                { targetlist    :: [TargetEntry]
+                , qual          :: [Expr]
+                , setopStrategy :: SetOpStrategy
+                , setOpCmd      :: SetOpCmd
+                , lefttree      :: Operator
+                , flagColIdx    :: Integer
+                , firstFlag     :: Integer
+                }
     deriving(Eq, Show)
-
 
 {-
    nest loop join node
@@ -185,6 +195,15 @@ data MergeEx = MergeEx
                 { mergeASC        :: Bool
                 , mergeNullsFirst :: Bool
                 }
+    deriving(Eq, Show)
+
+data SetOpCmd = SETOPCMD_INTERSECT
+              | SETOPCMD_INTERSECT_ALL
+              | SETOPCMD_EXCEPT
+              | SETOPCMD_EXCEPT_ALL
+    deriving(Eq, Show)
+
+data SetOpStrategy = SETOP_SORTED | SETOP_HASHED
     deriving(Eq, Show)
 
 data Expr = VAR
