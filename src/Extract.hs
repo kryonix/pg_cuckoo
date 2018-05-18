@@ -108,6 +108,19 @@ extract op = let
     mapM_ (~~>) qual
     mapM_ (~~>) indexqual
 
+(~>) (BITMAPINDEXSCAN {indexqual, indexname, scanrelation})
+  = do
+    logTable scanrelation
+    mapM_ (~~>) indexqual
+
+(~>) (BITMAPHEAPSCAN {targetlist, bitmapqualorig, operator, scanrelation})
+  = do
+    logTable scanrelation
+    mapM_ (~~~>) targetlist
+    mapM_ (~~>) bitmapqualorig
+    (~>) operator
+
+
 (~>) (AGG {targetlist, operator})
   = do
     mapM_ (~~~>) targetlist

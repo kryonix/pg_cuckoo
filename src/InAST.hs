@@ -68,6 +68,17 @@ data Operator = SEQSCAN
                 , indexname     :: String
                 , scanrelation  :: String
                 }
+              | BITMAPINDEXSCAN
+                { indexqual    :: [Expr]
+                , indexname    :: String
+                , scanrelation :: String
+                }
+              | BITMAPHEAPSCAN
+                { targetlist     :: [TargetEntry]
+                , bitmapqualorig :: [Expr]
+                , operator       :: Operator     -- Must be BITMAPINDEXSCAN?
+                , scanrelation   :: String       -- might be inferable
+                }
               | AGG
                 { targetlist  :: [TargetEntry]
                 , operator    :: Operator

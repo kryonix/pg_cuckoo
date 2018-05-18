@@ -284,6 +284,19 @@ data Plan = RESULT
             , indextlist    :: List TARGETENTRY
             , indexorderdir :: Integer
             }
+          | BITMAPINDEXSCAN
+            { genericPlan   :: GenericPlan
+            , scanrelid     :: Integer
+            , indexid       :: Integer
+            , isshared      :: PgBool
+            , indexqual     :: List Expr
+            , indexqualorig :: Null       -- ^ Not used at run time
+            }
+          | BITMAPHEAPSCAN
+            { genericPlan    :: GenericPlan
+            , scanrelid      :: Integer
+            , bitmapqualorig :: List Expr
+            }
           | AGG
             { genericPlan  :: GenericPlan
             , aggstrategy  :: Integer           -- ^ basic strategy 0: AGG_PLAN, 1: AGG_SORTED, 2: AGG_HASHED, 3: AGG_MIXED

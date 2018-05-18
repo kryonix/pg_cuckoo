@@ -136,6 +136,24 @@ validateExpr op = let
     mapM_ (~~>) qual
     mapM_ (~~>) indexqual
 
+(~>) (BITMAPINDEXSCAN {indexqual, indexname, scanrelation})
+  = do
+    when (null indexname)
+      $ logError "BITMAPINDEXSCAN: indexname not specified"
+
+    when (null scanrelation)
+      $ logError $ "BITMAPINDEXSCAN error: scanrelation is empty"
+
+    mapM_ (~~>) indexqual
+
+(~>) (BITMAPHEAPSCAN {targetlist, bitmapqualorig, operator, scanrelation})
+  = do
+    when (null scanrelation)
+      $ logError $ "BITMAPHEAPSCAN error: scanrelation is empty"
+
+    mapM_ (~~~>) targetlist
+    mapM_ (~~>) bitmapqualorig
+    (~>) operator
 
 (~>) (AGG {targetlist, operator})
   = do

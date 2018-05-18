@@ -541,7 +541,15 @@ hashjoin1 = A.HASHJOIN
               ]
             , A.joinType = A.INNER
             , A.inner_unique = True
-            , A.joinquals = []
+            , A.joinquals =
+              [ A.OPEXPR
+                { A.oprname = ">"
+                , A.oprargs =
+                  [ A.VAR "INNER_VAR" "a"
+                  , A.CONST "2" "int4"
+                  ]
+                }
+              ]
             , A.hashclauses =
               [ A.OPEXPR
                 { A.oprname = "="
@@ -652,6 +660,39 @@ indexonlyscan1 = A.INDEXONLYSCAN
                 , A.scanrelation = "indexed"
                 }
 
+bitmapheapscan1 :: A.Operator
+bitmapheapscan1 = A.BITMAPHEAPSCAN
+                  { A.targetlist =
+                    [ A.TargetEntry
+                      { A.targetexpr = A.VAR "indexed" "a"
+                      , A.targetresname = "a"
+                      , A.resjunk = False
+                      }
+                    , A.TargetEntry
+                      { A.targetexpr = A.VAR "indexed" "b"
+                      , A.targetresname = "b"
+                      , A.resjunk = False
+                      }
+                    ]
+                  , A.bitmapqualorig =
+                    []
+                  , A.operator =
+                      A.BITMAPINDEXSCAN
+                      { A.indexqual =
+                        [ A.OPEXPR
+                          { A.oprname = "="
+                          , A.oprargs =
+                            [ A.VAR "indexed_c" "c"
+                            , A.CONST "0.42" "numeric"
+                            ]
+                          }
+                        ]
+                      , A.indexname = "indexed_c"
+                      , A.scanrelation = "indexed"
+                      }
+                  , A.scanrelation = "indexed"
+                  }
+
 -- access list elements safely
 (!!) :: [a] -> Int -> Maybe a
 (!!) lst idx = if idx >= length lst
@@ -706,4 +747,4 @@ main = do
     let cp = forceEither config
     let authStr = forceEither $ get cp "Main" "dbauth" :: String
 
-    checkAndGenerate authStr indexonlyscan1
+    checkAndGenerate authStr bitmapheapscan1

@@ -484,6 +484,67 @@ trOperator (I.INDEXONLYSCAN {I.targetlist, I.qual, I.indexqual, I.indexorderby, 
               , O.indexorderdir = indexorderdir
               }
 
+
+trOperator (I.BITMAPINDEXSCAN {I.indexqual, I.indexname, I.scanrelation})
+  = do
+    context <- lift $ ask
+    table <- accessPgClass indexname
+
+    let context' = context {rtables=table:rtables context}
+
+    indexqual'  <- local (const context') $ mapM trExpr indexqual
+
+    rtables <- getRTables ()
+    let rtable:_ = filter (\x -> tName x == scanrelation) rtables
+    let (Just index) = elemIndex rtable rtables
+    let index' = fromIntegral index + 1
+    let origtbl = tOID rtable
+
+    tbl <- accessPgClass indexname
+    let indexColumns = zip [1..] (tCols tbl)
+
+    return $ O.BITMAPINDEXSCAN
+            { O.genericPlan = O.defaultPlan
+            , O.scanrelid = index'
+            , O.indexid   = tOID tbl
+            , O.isshared  = O.PgBool False
+            , O.indexqual = O.List indexqual'
+            , O.indexqualorig = O.Null
+            }
+
+trOperator (I.BITMAPHEAPSCAN {I.targetlist, I.bitmapqualorig, I.operator, I.scanrelation})
+  = do
+    context <- lift $ ask
+    operator' <- trOperator operator
+
+    -- OUTER_PLAN = first of appendplans
+    -- Generate a fake table with fake columns.
+    -- We need this to perform inference of VAR, referencing
+    -- sub-operators.
+    let fakeTable = createFakeTable "OUTER_VAR" (O.targetlist $ O.genericPlan operator')
+    -- Get rid of existing fake-tables (maybe not required?)
+    let rtablesC = dropWhile (\(PgTable {tOID}) -> tOID == -1) $ rtables context
+    let context' = context {rtables=fakeTable:rtablesC}
+
+    targetlist' <- local (const context') $ mapM trTargetEntry $ zip targetlist [1..]
+
+    bitmapqualorig' <- local (const context') $ mapM trExpr bitmapqualorig
+
+    rtables <- getRTables ()
+    let rtable:_ = filter (\x -> tName x == scanrelation) rtables
+    let (Just index) = elemIndex rtable rtables
+    let index' = fromIntegral index + 1
+    let origtbl = tOID rtable
+
+    return $ O.BITMAPHEAPSCAN
+              { O.genericPlan =
+                  O.defaultPlan
+                    { O.targetlist = O.List $ targetlist'
+                    , O.lefttree   = Just operator'
+                    }
+              , O.scanrelid = index'
+              , O.bitmapqualorig = O.List bitmapqualorig'}
+
 trOperator (I.AGG {I.targetlist, I.operator, I.groupCols})
   = do
     context <- lift $ ask
@@ -877,11 +938,17 @@ trExpr c@(I.CONST {})
 -- INNER_VAR ref: 65000
 -- OUTER_VAR ref: 65001
 -- INDEX_VAR ref: 65002
-trExpr (I.VAR { I.varTable, I.varColumn })
+trExpr v@(I.VAR { I.varTable, I.varColumn })
   = do
     rtables <- getRTables ()
-    let rtable:_ = filter (\x -> tName x == varTable) rtables
-    let column:_ = filter (\x -> cAttname x == varColumn) $ tCols rtable
+    let rtable' = filter (\x -> tName x == varTable) rtables
+    let rtable = case rtable' of
+                  r:_ -> r
+                  err -> error $ "No table found: " ++ PP.ppShow v ++ "\n" ++ PP.ppShow rtables
+    let column' = filter (\x -> cAttname x == varColumn) $ tCols rtable
+    let column = case column' of
+                  c:_ -> c
+                  err -> error $ "No column found: " ++ PP.ppShow v ++ "\n" ++ PP.ppShow rtables
     let tableKind = tKind rtable
     -- Calculate the index of the table in rtable of PlannedStmt
     let (Just index) = elemIndex rtable rtables

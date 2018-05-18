@@ -33,3 +33,5 @@ translate (Chunk "CONST" fs)
         constvalue = case fs ! "constvalue" of
                         (Extra (Int l) (Sequence constvalue')) -> Just $ Seq l constvalue'
                         NoValue -> Nothing
+
+translate err = error $ "Not implemented: " ++ ppShow err
