@@ -115,6 +115,11 @@ data Operator = SEQSCAN
                 { operator   :: Operator
                 , uniqueCols :: [Integer]
                 }
+              | SUBQUERYSCAN
+                { targetlist :: [TargetEntry]
+                , qual       :: [Expr]
+                , subplan    :: Operator
+                }
               | FUNCTIONSCAN
                 { targetlist     :: [TargetEntry]
                 , qual           :: [Expr]

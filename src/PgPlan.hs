@@ -345,6 +345,11 @@ data Plan = RESULT
             , uniqColIdx    :: PlainList Integer
             , uniqOperators :: PlainList Integer
             }
+          | SUBQUERYSCAN
+            { genericPlan :: GenericPlan
+            , scanrelid   :: Integer
+            , subplan     :: Plan
+            }
           | FUNCTIONSCAN
             { genericPlan    :: GenericPlan
             , scanrelid      :: Integer
@@ -390,6 +395,22 @@ data RangeEx = RTE
                 , insertedCols  :: Bitmapset -- Const []
                 , updatedCols   :: Bitmapset -- Const []
                 , securityQuals :: Null
+                }
+             | RTE_SUBQUERY
+                { alias            :: Maybe Alias
+                , eref             :: Alias
+                , rtekind          :: Integer
+                , subquery         :: Null
+                , security_barrier :: PgBool
+                , lateral          :: PgBool
+                , inh              :: PgBool
+                , inFromCl         :: PgBool
+                , requiredPerms    :: Integer
+                , checkAsUser      :: Integer
+                , selectedCols     :: Bitmapset
+                , insertedCols     :: Bitmapset
+                , updatedCols      :: Bitmapset
+                , securityQuals    :: Null
                 }
              | RTE_VALUES
                 { alias         :: Maybe Alias

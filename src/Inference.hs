@@ -153,6 +153,29 @@ pgTableToRTE t = O.RTE
     relkind = tKind t
 
 scanToRTE :: I.Operator -> O.RangeEx
+scanToRTE (I.SUBQUERYSCAN {I.targetlist})
+  = O.RTE_SUBQUERY
+      { O.alias = Nothing
+      , O.eref = erefA
+      , O.rtekind = 1
+      , O.subquery = O.Null
+      , O.security_barrier = O.PgBool False
+      , O.lateral = O.PgBool False
+      , O.inh = O.PgBool False
+      , O.inFromCl = O.PgBool False
+      , O.requiredPerms = 0
+      , O.checkAsUser = 0
+      , O.selectedCols = O.Bitmapset []
+      , O.insertedCols = O.Bitmapset []
+      , O.updatedCols  = O.Bitmapset []
+      , O.securityQuals = O.Null
+      }
+  where
+    colnum = length $ targetlist
+    erefA = O.Alias { O.aliasname = "SUBQUERY"
+                    , O.colnames  = O.List $ ["column"++show x | x <- [1..colnum]]
+                    }
+
 scanToRTE (I.VALUESSCAN {I.targetlist}) = O.RTE_VALUES
                   { O.alias = Nothing
                   , O.eref  = erefA
@@ -744,6 +767,56 @@ trOperator (I.UNIQUE {I.operator, I.uniqueCols})
               , O.uniqColIdx = O.PlainList uniqueCols
               , O.uniqOperators = O.PlainList ops
               }
+
+trOperator s@(I.SUBQUERYSCAN {I.targetlist, I.qual, I.subplan})
+  = do
+    qual' <- mapM trExpr qual
+    subplan' <- trOperator subplan
+
+    targetlist' <- forM (zip targetlist [1..]) 
+                $ \x -> do
+                  let (e, n) = x
+                  case e of
+                    (I.TargetEntry
+                      { I.targetexpr = I.SCANVAR {I.colPos}
+                      , I.targetresname
+                      , I.resjunk
+                      }) -> do
+                            let expr' = O.VAR
+                                        { O.varno = n
+                                        , O.varattno = colPos
+                                        , O.vartype  = getExprType $ O.expr $ (((\(O.List x) -> x) . O.targetlist . O.genericPlan) subplan') !! (fromIntegral colPos-1)
+                                        , O.vartypmod = -1
+                                        , O.varcollid = 0
+                                        , O.varlevelsup = 0
+                                        , O.varnoold = n
+                                        , O.varoattno = colPos
+                                        , O.location = -1 }
+                            return $ (O.TARGETENTRY
+                                      { O.expr = expr'
+                                      , O.resno = n
+                                      , O.resname = Just targetresname
+                                      , O.ressortgroupref = n
+                                      , O.resorigcol = 0
+                                      , O.resorigtbl = 0
+                                      , O.resjunk = O.PgBool resjunk
+                                      })
+                    _ -> trTargetEntry (e, n)
+
+
+    vscans <- getValueScans ()
+    let rel:_ = filter ((==s) . fst) vscans
+    let relid = snd rel
+
+    return $ O.SUBQUERYSCAN
+              { O.genericPlan = O.defaultPlan
+                                  { O.targetlist = O.List targetlist'
+                                  , O.qual = O.List qual'}
+              , O.scanrelid = relid
+              , O.subplan   = subplan'
+              }
+
+
 
 trOperator t@(I.FUNCTIONSCAN {I.targetlist, I.qual, I.functions, I.funcordinality})
   = do

@@ -200,6 +200,12 @@ validateExpr op = let
       $ logError $ "UNIQUE: no uniqueCols specified"
     (~>) operator
 
+(~>) (SUBQUERYSCAN {targetlist, qual, subplan})
+  = do
+    mapM_ (~~~>) targetlist
+    mapM_ (~~>) qual
+    (~>) subplan
+
 (~>) (FUNCTIONSCAN { targetlist, qual, functions })
   = do
     when (null functions)

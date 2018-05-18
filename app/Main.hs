@@ -845,6 +845,29 @@ mergejoin1 = A.MERGEJOIN
                 }
               }
 
+subqueryscan1 :: A.Operator
+subqueryscan1 = A.SUBQUERYSCAN
+                { A.targetlist =
+                    [ A.TargetEntry
+                        { A.targetexpr = A.SCANVAR 1
+                        , A.targetresname = "foo"
+                        , A.resjunk = False
+                        }
+                    ]
+                , A.qual = []
+                , A.subplan =
+                    A.RESULT
+                    { A.targetlist =
+                        [ A.TargetEntry
+                            { A.targetexpr = A.CONST "42" "int4"
+                            , A.targetresname = "x"
+                            , A.resjunk = False
+                            }
+                        ]
+                    , A.resconstantqual = Nothing
+                    }
+                }
+
 -- access list elements safely
 (!!) :: [a] -> Int -> Maybe a
 (!!) lst idx = if idx >= length lst
@@ -899,4 +922,4 @@ main = do
     let cp = forceEither config
     let authStr = forceEither $ get cp "Main" "dbauth" :: String
 
-    checkAndGenerate authStr mergejoin1
+    checkAndGenerate authStr subqueryscan1

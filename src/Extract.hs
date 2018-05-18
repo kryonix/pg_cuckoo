@@ -150,6 +150,13 @@ extract op = let
 
 (~>) (UNIQUE {operator}) = (~>) operator
 
+(~>) s@(SUBQUERYSCAN {targetlist, qual, subplan})
+  = do
+    logScan s
+    mapM_ (~~~>) targetlist
+    mapM_ (~~>) qual
+    (~>) subplan
+
 (~>) f@(FUNCTIONSCAN { targetlist, qual, functions })
   = do
     logScan f
