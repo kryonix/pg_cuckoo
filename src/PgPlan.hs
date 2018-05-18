@@ -327,6 +327,18 @@ data Plan = RESULT
             , joinquals    :: List Expr
             , nestParams   :: List NestLoopParam
             }
+          | MERGEJOIN
+            { genericPlan :: GenericPlan
+            , jointype    :: Integer
+            , inner_unique :: PgBool
+            , joinquals    :: List Expr
+            , skip_mark_restore :: PgBool
+            , mergeclauses      :: List Expr
+            , mergeFamilies     :: PlainList Integer
+            , mergeCollations   :: PlainList Integer
+            , mergeStrategies   :: PlainList Integer
+            , mergeNullsFirst   :: PlainList PgBool
+            }
           | UNIQUE
             { genericPlan   :: GenericPlan
             , numCols       :: Integer

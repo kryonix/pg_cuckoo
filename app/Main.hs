@@ -779,6 +779,72 @@ bitmapor1 = A.BITMAPHEAPSCAN
             , A.scanrelation = "indexed"
             }
 
+mergejoin1 :: A.Operator
+mergejoin1 = A.MERGEJOIN
+              { A.targetlist =
+                [ A.TargetEntry
+                  { A.targetexpr = A.VAR "OUTER_VAR" "a"
+                  , A.targetresname = "a"
+                  , A.resjunk = False
+                  }
+                , A.TargetEntry
+                  { A.targetexpr = A.VAR "OUTER_VAR" "b"
+                  , A.targetresname = "b"
+                  , A.resjunk = False
+                  }
+                , A.TargetEntry
+                  { A.targetexpr = A.VAR "INNER_VAR" "x"
+                  , A.targetresname = "x"
+                  , A.resjunk = False
+                  }
+                , A.TargetEntry
+                  { A.targetexpr = A.VAR "INNER_VAR" "y"
+                  , A.targetresname = "y"
+                  , A.resjunk = False
+                  }
+                ]
+              , A.qual = []
+              , A.joinType = A.INNER
+              , A.inner_unique = True
+              , A.joinquals = []
+              , A.mergeclauses = []
+              , A.mergeStrategies = []
+              , A.lefttree =
+                A.SEQSCAN
+                { A.targetlist =
+                  [ A.TargetEntry
+                    { A.targetexpr = A.VAR "grp" "a"
+                    , A.targetresname = "a"
+                    , A.resjunk = False
+                    }
+                  , A.TargetEntry
+                    { A.targetexpr = A.VAR "grp" "b"
+                    , A.targetresname = "b"
+                    , A.resjunk = False
+                    }
+                  ]
+                , A.qual = []
+                , A.scanrelation = "grp"
+                }
+              , A.righttree =
+                A.SEQSCAN
+                { A.targetlist =
+                  [ A.TargetEntry
+                    { A.targetexpr = A.VAR "grp" "a"
+                    , A.targetresname = "x"
+                    , A.resjunk = False
+                    }
+                  , A.TargetEntry
+                    { A.targetexpr = A.VAR "grp" "b"
+                    , A.targetresname = "y"
+                    , A.resjunk = False
+                    }
+                  ]
+                , A.qual = []
+                , A.scanrelation = "grp"
+                }
+              }
+
 -- access list elements safely
 (!!) :: [a] -> Int -> Maybe a
 (!!) lst idx = if idx >= length lst
@@ -833,4 +899,4 @@ main = do
     let cp = forceEither config
     let authStr = forceEither $ get cp "Main" "dbauth" :: String
 
-    checkAndGenerate authStr bitmapor1
+    checkAndGenerate authStr mergejoin1

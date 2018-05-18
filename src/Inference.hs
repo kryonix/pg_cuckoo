@@ -675,6 +675,56 @@ trOperator (I.NESTLOOP {I.targetlist, I.joinType, I.inner_unique, I.joinquals, I
               , O.nestParams = O.List []
               }
 
+trOperator (I.MERGEJOIN {I.targetlist, I.qual, I.joinType, I.inner_unique, I.joinquals, I.mergeclauses, I.mergeStrategies, I.lefttree, I.righttree})
+  = do
+    lefttree' <- trOperator lefttree
+    righttree' <- trOperator righttree
+
+    context <- lift $ ask
+
+    let fakeOuter = createFakeTable "OUTER_VAR" (O.targetlist $ O.genericPlan lefttree')
+    let fakeInner = createFakeTable "INNER_VAR" (O.targetlist $ O.genericPlan righttree')
+    let fakeTables = [fakeOuter, fakeInner]
+
+    -- Get rid of existing fake-tables (maybe not required?)
+    let rtablesC = dropWhile (\(PgTable {tOID}) -> tOID == -1) $ rtables context
+    let context' = context {rtables=fakeTables++rtablesC}
+
+    targetlist' <- local (const context') $ mapM trTargetEntry $ zip targetlist [1..]
+    joinquals'  <- local (const context') $ mapM trExpr joinquals
+    mergeclauses' <- local (const context') $ mapM trExpr mergeclauses
+    qual'         <- local (const context') $ mapM trExpr qual
+
+    let joinType' = case joinType of
+                      I.INNER -> 0
+                      I.LEFT  -> 1
+                      I.FULL  -> 2
+                      I.RIGHT -> 3
+                      I.SEMI  -> 4
+                      I.ANTI  -> 5
+    
+    let mergeStrategies' = map (\x -> if I.mergeASC x then 1 else -1) mergeStrategies
+    let mergeNullsFirst  = map (O.PgBool . I.mergeNullsFirst) mergeStrategies
+    let mergeCollations  = replicate (length mergeclauses) 0
+    let mergeFamilies    = replicate (length mergeclauses) 0
+    return $ O.MERGEJOIN
+              { O.genericPlan = O.defaultPlan 
+                                  { O.targetlist = O.List targetlist'
+                                  , O.qual = O.List qual'
+                                  , O.lefttree = Just lefttree'
+                                  , O.righttree = Just righttree'
+                                  }
+              , O.jointype = joinType'
+              , O.inner_unique = O.PgBool inner_unique
+              , O.joinquals = O.List joinquals'
+              , O.skip_mark_restore = O.PgBool True
+              , O.mergeclauses = O.List mergeclauses'
+              , O.mergeFamilies = O.PlainList mergeFamilies
+              , O.mergeCollations = O.PlainList mergeCollations
+              , O.mergeStrategies = O.PlainList mergeStrategies'
+              , O.mergeNullsFirst = O.PlainList mergeNullsFirst
+              }
+
 trOperator (I.UNIQUE {I.operator, I.uniqueCols})
   = do
     operator' <- trOperator operator

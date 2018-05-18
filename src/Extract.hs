@@ -138,6 +138,16 @@ extract op = let
     (~>) lefttree
     (~>) righttree
 
+(~>) (MERGEJOIN {targetlist, qual, joinquals, mergeclauses, lefttree, righttree})
+  = do
+    mapM_ (~~~>) targetlist
+    mapM_ (~~>) joinquals
+    mapM_ (~~>) mergeclauses
+    mapM_ (~~>) qual
+
+    (~>) lefttree
+    (~>) righttree
+
 (~>) (UNIQUE {operator}) = (~>) operator
 
 (~>) f@(FUNCTIONSCAN { targetlist, qual, functions })

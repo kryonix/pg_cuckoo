@@ -8,6 +8,7 @@ Author      : Denis Hirn
 module InAST ( Operator(..)
              , TargetEntry(..)
              , SortEx(..)
+             , MergeEx(..)
              , Expr(..)
              , JoinType(..)
              , NestLoopParam(..) ) where
@@ -99,6 +100,17 @@ data Operator = SEQSCAN
                 , lefttree     :: Operator
                 , righttree    :: Operator
                 }
+              | MERGEJOIN
+                { targetlist      :: [TargetEntry]
+                , qual            :: [Expr]
+                , joinType        :: JoinType
+                , inner_unique    :: Bool
+                , joinquals       :: [Expr]
+                , mergeclauses    :: [Expr]
+                , mergeStrategies :: [MergeEx]
+                , lefttree        :: Operator
+                , righttree       :: Operator
+                }
               | UNIQUE
                 { operator   :: Operator
                 , uniqueCols :: [Integer]
@@ -162,6 +174,12 @@ data SortEx = SortEx
               , sortASC        :: Bool
               , sortNullsFirst :: Bool
               }
+    deriving(Eq, Show)
+
+data MergeEx = MergeEx
+                { mergeASC        :: Bool
+                , mergeNullsFirst :: Bool
+                }
     deriving(Eq, Show)
 
 data Expr = VAR

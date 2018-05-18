@@ -182,6 +182,18 @@ validateExpr op = let
     (~>) lefttree
     (~>) righttree
 
+(~>) (MERGEJOIN {targetlist, qual, joinquals, mergeclauses, mergeStrategies, lefttree, righttree})
+  = do
+    when (length mergeclauses /= length mergeStrategies)
+      $ logError "MERGEJOIN: mergeStrategies must have same length as the mergeclauses list"
+    mapM_ (~~~>) targetlist
+    mapM_ (~~>) joinquals
+    mapM_ (~~>) mergeclauses
+    mapM_ (~~>) qual
+
+    (~>) lefttree
+    (~>) righttree
+
 (~>) (UNIQUE {operator, uniqueCols})
   = do
     when (null uniqueCols)
