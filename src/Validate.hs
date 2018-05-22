@@ -9,8 +9,10 @@ Errors are collected and can then be used for error messages.
 
 {-# LANGUAGE NamedFieldPuns #-}
 
-module Validate ( validateOperator
+module Validate ( validatePlannedStmt
+                , validateOperator
                 , validateExpr
+                , isValidPlannedStmt
                 , isValidOperator
                 , isValidExpr ) where
 
@@ -33,6 +35,17 @@ logError err = tell (Log [err])
 type Rule a b = a -> OperSem () () b Log
 
 -- | Checks whether an operator is valid or not
+isValidPlannedStmt :: I.PlannedStmt -> Bool
+isValidPlannedStmt op = null $ validatePlannedStmt op
+
+-- | Validates an operator and returns all errors
+validatePlannedStmt :: I.PlannedStmt -> [String]
+validatePlannedStmt op = let
+                      (_, lg) = runOperSem ((+>) op) () ()
+                      (Log lg') = lg
+                      in lg'
+
+-- | Checks whether an operator is valid or not
 isValidOperator :: I.Operator -> Bool
 isValidOperator op = null $ validateOperator op 
 
@@ -53,6 +66,13 @@ validateExpr op = let
                 (_, lg) = runOperSem ((~~>) op) () ()
                 (Log lg') = lg
                 in lg'
+
+-- | Validate PlannedStmt
+(+>) :: Rule I.PlannedStmt ()
+(+>) (PlannedStmt {I.planTree, I.subplans})
+  = do
+    (~>) planTree
+    mapM_ (~>) subplans
 
 -- | Operator validator
 (~>) :: Rule I.Operator ()
@@ -228,6 +248,11 @@ validateExpr op = let
       $ logError $ "VALUESSCAN: no values specified"
     mapM_ (~~>) qual
     mapM_ (mapM_ (~~>)) values_list
+
+(~>) (CTESCAN {targetlist, qual})
+  = do
+    mapM_ (~~~>) targetlist
+    mapM_ (~~>) qual
 
 (~>) (HASH {targetlist, qual, operator, skewTable})
   = do

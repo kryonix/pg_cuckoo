@@ -1035,6 +1035,36 @@ windowfunc1 = A.WINDOWAGG
               , A.endOffset = Nothing
               }
 
+ctescan1 :: A.PlannedStmt
+ctescan1 = A.PlannedStmt
+            { A.planTree =
+                A.CTESCAN
+                { A.targetlist =
+                    [ A.TargetEntry
+                      { A.targetexpr = A.SCANVAR 1
+                      , A.targetresname = "x"
+                      , A.resjunk = False
+                      }
+                    ]
+                , A.qual = []
+                , A.ctename = "num"
+                , A.recursive = False
+                , A.initPlan = [1]
+                }
+            , A.subplans =
+              [ A.RESULT
+                { A.targetlist =
+                  [ A.TargetEntry
+                    { A.targetexpr = A.CONST "42" "int4"
+                    , A.targetresname = "x"
+                    , A.resjunk = False
+                    }
+                  ]
+                , A.resconstantqual = Nothing
+                }
+              ]
+            }
+
 -- access list elements safely
 (!!) :: [a] -> Int -> Maybe a
 (!!) lst idx = if idx >= length lst
@@ -1067,6 +1097,42 @@ checkAndGenerate authStr op = do
   putStrLn $ PP.ppShow consts'
 
   -- Infere output AST
+  let infered = generatePlan tableDataR consts' (lgTableNames consts) (lgScan consts) (A.PlannedStmt op [])
+  
+  -- Print AST structure as well as the postgres plan
+  putStrLn $ PP.ppShow infered
+  let pgplan = gprint infered
+  putStrLn $ "Explain: "
+  putStrLn $ "select _pq_plan_explain('" ++ pgplan ++ "');"
+  putStrLn $ "Execute:"
+  putStrLn $ "select _pq_plan_deserialize('" ++ pgplan ++ "');"
+
+checkAndGenerateStmt :: String -> A.PlannedStmt -> IO ()
+checkAndGenerateStmt authStr op = do
+  -- Validate the AST
+  putStrLn $ "Validate: "
+  let errs = V.validatePlannedStmt op
+  -- Print errors
+  -- putStrLn $ intercalate "\n" errs
+
+  unless (null errs) $
+    do
+      error $ "AST is invalid:\n" ++ intercalate "\n" errs
+
+  -- Get Catalog data
+  tableDataR <- getTableData authStr
+
+  -- Use Extract.hs to extract information from AST to be pre-transformed etc.
+  let consts = E.extractP op
+  putStrLn $ PP.ppShow consts
+
+  -- Compile constants
+  consts' <- mapM (\x -> L.parseConst authStr x >>= \p -> return (x, p)) $ lgconsts consts
+  
+  -- Debug output of constants
+  putStrLn $ PP.ppShow consts'
+
+  -- Infere output AST
   let infered = generatePlan tableDataR consts' (lgTableNames consts) (lgScan consts) op
   
   -- Print AST structure as well as the postgres plan
@@ -1089,4 +1155,5 @@ main = do
     let cp = forceEither config
     let authStr = forceEither $ get cp "Main" "dbauth" :: String
 
-    checkAndGenerate authStr windowfunc1
+    -- checkAndGenerate authStr ctescan1
+    checkAndGenerateStmt authStr ctescan1

@@ -7,7 +7,7 @@ Author      : Denis Hirn
 
 {-# LANGUAGE NamedFieldPuns #-}
 
-module Extract ( extract, Log(..) ) where
+module Extract ( extract, extractP, Log(..) ) where
 
 import OperSem
 import InAST as I
@@ -36,10 +36,22 @@ logScan scan = tell (Log [] [] [scan])
 type Rule a b = a -> OperSem () () b Log
 
 -- | Extracts nodes
+extractP :: I.PlannedStmt -> Log
+extractP op = let
+              (_, lg) = runOperSem ((+>) op) () ()
+              in lg
+
+-- | Extracts nodes
 extract :: I.Operator -> Log
 extract op = let
               (_, lg) = runOperSem ((~>) op) () ()
               in lg
+
+(+>) :: Rule I.PlannedStmt ()
+(+>) (PlannedStmt {I.planTree, I.subplans})
+  = do
+    (~>) planTree
+    mapM_ (~>) subplans
 
 -- | Operator validator
 (~>) :: Rule I.Operator ()
@@ -177,6 +189,12 @@ extract op = let
     mapM_ (~~~>) targetlist
     mapM_ (~~>) qual
     mapM_ (mapM_ (~~>)) values_list
+
+(~>) s@(CTESCAN {targetlist, qual})
+  = do
+    logScan s
+    mapM_ (~~~>) targetlist
+    mapM_ (~~>) qual
 
 (~>) (HASH {targetlist, qual, operator, skewTable})
   = do

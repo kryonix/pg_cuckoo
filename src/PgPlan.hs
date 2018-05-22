@@ -26,6 +26,7 @@ module PgPlan ( Null(..)
               , Seq(..)
               , TARGETENTRY(..)
               , RelationList(..)
+              , IndexList(..)
               , Bitmapset(..)
               , Alias(..)
               , PlainList(..)
@@ -64,6 +65,9 @@ data Bitmapset = Bitmapset [Integer]
 data PlainList a = PlainList [a]
     deriving(Eq, Show)
 
+data IndexList = IndexList [Integer]
+    deriving(Eq, Show)
+
 data Seq = Seq 
             { seqlength :: Integer
             , seqvalues :: [Integer] }
@@ -94,6 +98,10 @@ instance GPrint Bitmapset where
 instance GPrint RelationList where
   gprint (RelationList []) = "<>"
   gprint (RelationList xs) = "(o " ++ (intercalate " " $ map gprint xs) ++ ")"
+
+instance GPrint IndexList where
+  gprint (IndexList []) = "<>"
+  gprint (IndexList xs) = "(i " ++ (intercalate " " $ map gprint xs) ++ ")"
 
 instance GPrint PgBool where
   gprint (PgBool x) = gprint x
@@ -177,7 +185,7 @@ data GenericPlan = GenericPlan
                     , qual           :: List Expr -- implicitly-ANDed qual conditions
                     , lefttree       :: Maybe Plan -- input plan tree(s)
                     , righttree      :: Maybe Plan -- input
-                    , initPlan       :: Maybe Plan -- Init Plan nodes (un-correlated expr subselects)
+                    , initPlan       :: List Plan -- Init Plan nodes (un-correlated expr subselects)
                     , extParam       :: Bitmapset  -- (b id₁ ... idₙ)
                     , allParam       :: Bitmapset  -- (b id₁ ... idₙ)
                     }
@@ -196,7 +204,7 @@ defaultPlan = GenericPlan
               , qual=List []
               , lefttree=Nothing
               , righttree=Nothing
-              , initPlan=Nothing
+              , initPlan=List []
               , extParam=Bitmapset []
               , allParam=Bitmapset [] }
 
@@ -374,6 +382,12 @@ data Plan = RESULT
             , scanrelid   :: Integer
             , values_list :: List (List Expr)
             }
+          | CTESCAN
+            { genericPlan :: GenericPlan
+            , scanrelid   :: Integer
+            , ctePlanId   :: Integer
+            , cteParam    :: Integer
+            }
           | HASH
             { genericPlan :: GenericPlan
             , skewTable   :: Integer
@@ -397,6 +411,24 @@ data Plan = RESULT
             , flagColIdx   :: Integer
             , firstFlag    :: Integer
             , numGroups    :: Integer
+            }
+          | SUBPLAN
+            { subLinkType       :: Integer
+            , testexpr          :: Maybe Expr
+            , paramIds          :: List Integer
+            , plan_id           :: Integer
+            , plan_name         :: String
+            , firstColType      :: Integer
+            , firstColTypmod    :: Integer
+            , firstColCollation :: Integer
+            , useHashTable      :: PgBool
+            , unknownEqFalse    :: PgBool
+            , _parallel_safe     :: PgBool
+            , setParam          :: IndexList
+            , perParam          :: IndexList
+            , __args              :: List Expr
+            , _startup_cost      :: Double
+            , per_call_cost     :: Double
             }
     deriving (Eq, Show, Generic, GPrint)
 
@@ -453,6 +485,26 @@ data RangeEx = RTE
                 , insertedCols  :: Bitmapset
                 , updatedCols   :: Bitmapset
                 , securityQuals :: Null
+                }
+             | RTE_CTE
+                { alias          :: Maybe Alias
+                , eref           :: Alias
+                , rtekind        :: Integer
+                , ctename        :: String
+                , ctelevelsup    :: Integer
+                , self_reference :: PgBool
+                , coltypes       :: Null
+                , coltypmods     :: Null
+                , colcollations  :: Null
+                , lateral        :: PgBool
+                , inh            :: PgBool
+                , inFromCl       :: PgBool
+                , requiredPerms  :: Integer
+                , checkAsUser    :: Integer
+                , selectedCols   :: Bitmapset
+                , insertedCols   :: Bitmapset
+                , updatedCols    :: Bitmapset
+                , securityQuals  :: Null
                 }
              | RTE_FUNCTIONS
                 { alias           :: Maybe Alias

@@ -27,9 +27,9 @@ import Debug.Trace
 --------------------------------------------------------------------------------
 -- Exported functions
 
-generatePlan :: TableData -> [(I.Expr, O.Expr)] -> [String] -> [I.Operator] -> I.Operator -> O.PLANNEDSTMT
+generatePlan :: TableData -> [(I.Expr, O.Expr)] -> [String] -> [I.Operator] -> I.PlannedStmt -> O.PLANNEDSTMT
 generatePlan tableD exprs tableNames valuesScan ast = let
-    (stmt, lg) = runOperSem (trPlannedStmt ast tableNames valuesScan) (StateI 0) (C tableD exprs [] [])
+    (stmt, lg) = runOperSem (trPlannedStmt ast tableNames valuesScan) (StateI 0 0) (C tableD exprs [] [] [])
     res = case stmt of
             Prelude.Left str -> error $ "Inference error: " ++ str
             Prelude.Right a -> a
@@ -42,6 +42,7 @@ data Context = C { tableData  :: TableData          -- ^ as provided by the GetT
                  , exprs      :: [(I.Expr, O.Expr)]
                  , rtables    :: [PgTable]
                  , valueScans :: [(I.Operator, Integer)]
+                 , subplanLst :: [O.Plan]
                  }
 
 getRTableData :: Rule () TableData
@@ -55,6 +56,9 @@ getRTables () = lift $ asks rtables
 
 getValueScans :: Rule () [(I.Operator, Integer)]
 getValueScans () = lift $ asks valueScans
+
+getSubplanLst :: Rule () [O.Plan]
+getSubplanLst () = lift $ asks subplanLst
 
 getRTableRow :: Rule (TableData -> Tbl.Table, Table -> [Row]) [Row]
 getRTableRow (tbl, idx) = do
@@ -80,18 +84,30 @@ logError err = tell (Log [err])
 --------------------------------------------------------------------------------
 -- STATE MONAD SECTION
 
-data StateI = StateI { count :: Integer }
+data StateI = StateI { count :: Integer
+                     , paramCnt :: Integer
+                     }
 
 fresh :: Rule String String
 fresh v = do
   n <- lift $ gets count
-  lift $ modify (\x -> StateI (count x+1))
+  lift $ modify (\x -> StateI (count x+1) (paramCnt x))
   return (v ++ show n)
 
 freshI :: Rule () Integer
 freshI () = do
   n <- lift $ gets count
-  lift $ modify (\x -> StateI (count x+1))
+  lift $ modify (\x -> StateI (count x+1) (paramCnt x))
+  return n
+
+incrParam :: Rule Integer ()
+incrParam i = do
+  lift $ modify (\x -> StateI (count x) (paramCnt x + i))
+  return ()
+
+fetchParamCnt :: Rule () Integer
+fetchParamCnt () = do
+  n <- lift $ gets paramCnt
   return n
 
 -- / STATE MONAD SECTION
@@ -109,22 +125,41 @@ type Rule3 a b c d = a -> b -> c -> OperSem StateI Context d Log
 --------------------------------------------------------------------------------
 -- Inference rules
 
-trPlannedStmt :: Rule3 I.Operator [String] [I.Operator] O.PLANNEDSTMT
-trPlannedStmt op tbls valuesScan = do
+trPlannedStmt :: Rule3 I.PlannedStmt [String] [I.Operator] O.PLANNEDSTMT
+trPlannedStmt (I.PlannedStmt op subplan) tbls valuesScan = do
   tables <- mapM accessPgClass tbls
   context <- lift $ ask
+
+  subplan' <- mapM trOperator subplan
+
+  subplan'' <- do
+    let plans'' = zip [1..] subplan'
+    let plans''' = map (\(n, x) -> x {O.genericPlan=(O.genericPlan x) {O.plan_node_id=n}}) plans''
+    return plans'''
 
   let numTables = length tbls
   let context' = const $ context { rtables=tables
                                  , valueScans= map (\(a, b) -> (a, fromIntegral b)) 
-                                                $ zip valuesScan [numTables..numTables+(length valuesScan)] }
+                                                $ zip valuesScan [numTables..numTables+(length valuesScan)]
+                                 , subplanLst = subplan''
+                                 }
   res <- local context' $ trOperator op
 
   let rte    = map pgTableToRTE tables
   let values = map scanToRTE valuesScan
+
   let rtable = O.List $ rte ++ values
 
-  return $ O.defaultPlannedStmt { O.planTree = res, O.rtable=rtable }
+  -- We have to do some bookkeeping about the parameter count,
+  -- otherwise postgres crashes.
+  params <- fetchParamCnt ()
+
+  return $ O.defaultPlannedStmt 
+            { O.planTree = res
+            , O.rtable=rtable
+            , O.subplans= O.List subplan''
+            , O.nParamExec = params
+            }
 
 pgTableToRTE :: PgTable -> O.RangeEx
 pgTableToRTE t = O.RTE
@@ -176,28 +211,57 @@ scanToRTE (I.SUBQUERYSCAN {I.targetlist})
                     , O.colnames  = O.List $ ["column"++show x | x <- [1..colnum]]
                     }
 
-scanToRTE (I.VALUESSCAN {I.targetlist}) = O.RTE_VALUES
-                  { O.alias = Nothing
-                  , O.eref  = erefA
-                  , O.rtekind = 5
-                  , O.values_lists = O.Null
-                  , O.coltypes = O.Null
-                  , O.coltypmods = O.Null
-                  , O.colcollations = O.Null
-                  , O.lateral = O.PgBool False
-                  , O.inh = O.PgBool False
-                  , O.inFromCl = O.PgBool True
-                  , O.requiredPerms = 2
-                  , O.checkAsUser = 0
-                  , O.selectedCols  = O.Bitmapset []
-                  , O.insertedCols  = O.Bitmapset []
-                  , O.updatedCols   = O.Bitmapset []
-                  , O.securityQuals = O.Null
-                  }
+scanToRTE (I.VALUESSCAN {I.targetlist}) 
+  = O.RTE_VALUES
+      { O.alias = Nothing
+      , O.eref  = erefA
+      , O.rtekind = 5
+      , O.values_lists = O.Null
+      , O.coltypes = O.Null
+      , O.coltypmods = O.Null
+      , O.colcollations = O.Null
+      , O.lateral = O.PgBool False
+      , O.inh = O.PgBool False
+      , O.inFromCl = O.PgBool True
+      , O.requiredPerms = 2
+      , O.checkAsUser = 0
+      , O.selectedCols  = O.Bitmapset []
+      , O.insertedCols  = O.Bitmapset []
+      , O.updatedCols   = O.Bitmapset []
+      , O.securityQuals = O.Null
+      }
   where
     colnum = length $ targetlist
     erefA = O.Alias { O.aliasname = "VALUES"
                     , O.colnames  = O.List $ ["column"++show x | x <- [1..colnum]]
+                    }
+
+scanToRTE (I.CTESCAN {I.targetlist, I.qual, I.ctename, I.recursive})
+  = O.RTE_CTE
+      { O.alias = Nothing
+      , O.eref  = erefA
+      , O.rtekind = 6
+      , O.ctename = ctename
+      , O.ctelevelsup = 0
+      , O.self_reference = O.PgBool recursive
+      , O.coltypes = O.Null
+      , O.coltypmods = O.Null
+      , O.colcollations = O.Null
+      , O.lateral = O.PgBool False
+      , O.inh = O.PgBool False
+      , O.inFromCl = O.PgBool True
+      , O.requiredPerms = 2
+      , O.checkAsUser = 0
+      , O.selectedCols  = O.Bitmapset []
+      , O.insertedCols  = O.Bitmapset []
+      , O.updatedCols   = O.Bitmapset []
+      , O.securityQuals = O.Null
+      }
+  where
+    colnum = length $ targetlist
+    colnames = map I.targetresname targetlist
+    erefA = O.Alias { O.aliasname = ctename
+                    , O.colnames  = O.List colnames
                     }
 
 scanToRTE (I.FUNCTIONSCAN {I.targetlist, I.funcordinality})
@@ -973,6 +1037,64 @@ trOperator s@(I.VALUESSCAN {I.targetlist, I.qual, I.values_list})
               , O.values_list = O.List $ map O.List values_list'
               }
 
+trOperator s@(I.CTESCAN {I.targetlist, I.qual, I.ctename, I.recursive, I.initPlan})
+  = do
+    context <- lift $ ask
+    -- targetlist' <- mapM trTargetEntry $ zip targetlist [1..]
+
+    let subplans  = subplanLst context
+    let subplan = filter (\x -> O.plan_node_id (O.genericPlan x) `elem` initPlan) subplans
+
+    subplans' <- mapM (trSubPlan ctename) $ zip [0..] subplan
+
+    targetlist' <- forM (zip targetlist [1..])
+                    $ \x -> do
+                      let (e, n) = x
+                      case e of
+                        (I.TargetEntry
+                          { I.targetexpr = I.SCANVAR {I.colPos}
+                          , I.targetresname
+                          , I.resjunk
+                          }) -> do
+                                let expr' = O.VAR
+                                            { O.varno = n
+                                            , O.varattno = colPos
+                                            , O.vartype  = getExprType $ O.expr $ (((\(O.List x) -> x) . O.targetlist . O.genericPlan) (head subplans)) !! (fromIntegral colPos-1)
+                                            , O.vartypmod = -1
+                                            , O.varcollid = 0
+                                            , O.varlevelsup = 0
+                                            , O.varnoold = n
+                                            , O.varoattno = colPos
+                                            , O.location = -1 }
+                                return $ (O.TARGETENTRY
+                                          { O.expr = expr'
+                                          , O.resno = n
+                                          , O.resname = Just targetresname
+                                          , O.ressortgroupref = n
+                                          , O.resorigcol = 0
+                                          , O.resorigtbl = 0
+                                          , O.resjunk = O.PgBool resjunk
+                                          })
+                        _ -> trTargetEntry (e, n)
+
+    qual'       <- mapM trExpr qual
+
+    vscans <- getValueScans ()
+    let rel:_ = filter ((==s) . fst) vscans
+    let relid = snd rel
+
+    return $ O.CTESCAN
+              { O.genericPlan =
+                  O.defaultPlan
+                    { O.targetlist = O.List targetlist'
+                    , O.initPlan   = O.List subplans'
+                    , O.allParam   = O.Bitmapset $ if null initPlan then [] else [0..fromIntegral (length initPlan)]
+                    }
+              , O.scanrelid = relid
+              , O.ctePlanId = head initPlan
+              , O.cteParam  = 0
+              }
+
 trOperator s@(I.HASH {I.targetlist, I.qual, I.operator, I.skewTable, I.skewColumn})
   = do
     context <- lift $ ask
@@ -1164,6 +1286,36 @@ trTargetEntry (I.TargetEntry { I.targetexpr, I.targetresname, I.resjunk }, resno
               , O.resorigtbl      = 0
               , O.resorigcol      = 0
               , O.resjunk         = O.PgBool resjunk
+              }
+
+
+-- | Generates a SUBPLAN node
+-- We statically generate a param for each subplan node,
+-- this might be incorrect, but will do for now.
+trSubPlan :: Rule2 String (Integer, O.Plan) O.Plan
+trSubPlan name (n, x) = do
+    let (O.GenericPlan {O.plan_node_id, O.targetlist}) = O.genericPlan x
+
+    -- Have to do bookkeeping about the number of params 'generated'
+    incrParam 1
+
+    return $ O.SUBPLAN
+              { O.subLinkType       = 7
+              , O.testexpr          = Nothing
+              , O.paramIds          = O.List [n]
+              , O.plan_id           = plan_node_id
+              , O.plan_name         = name
+              , O.firstColType      = getExprType $ O.expr $ head $ (\(O.List x) -> x) targetlist
+              , O.firstColTypmod    = -1
+              , O.firstColCollation = 0
+              , O.useHashTable      = O.PgBool False
+              , O.unknownEqFalse    = O.PgBool False
+              , O._parallel_safe    = O.PgBool False
+              , O.setParam          = O.IndexList []
+              , O.perParam          = O.IndexList []
+              , O.__args            = O.List []
+              , O._startup_cost     = 0.0
+              , O.per_call_cost     = 0.0
               }
 
 trExpr :: Rule I.Expr O.Expr
@@ -1505,6 +1657,8 @@ trExpr (I.NOT { I.arg })
             , O.args     = O.List [arg']
             , O.location = -1
             }
+
+trExpr err = error $ "trExpr not implemented: \n" ++ PP.ppShow err
 
 --------------------------------------------------------------------------------
 --

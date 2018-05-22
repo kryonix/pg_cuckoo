@@ -5,7 +5,8 @@ Author      : Denis Hirn
 
 -}
 
-module InAST ( Operator(..)
+module InAST ( PlannedStmt(..)
+             , Operator(..)
              , TargetEntry(..)
              , SortEx(..)
              , MergeEx(..)
@@ -16,6 +17,12 @@ module InAST ( Operator(..)
              , NestLoopParam(..)
              , FrameOptions(..)
              , frameOptionToBits ) where
+
+data PlannedStmt = PlannedStmt
+                    { planTree :: Operator
+                    , subplans :: [Operator]
+                    }
+    deriving (Eq, Show)
 
 data Operator = SEQSCAN
                 { targetlist   :: [TargetEntry]
@@ -144,6 +151,13 @@ data Operator = SEQSCAN
                 { targetlist  :: [TargetEntry]
                 , qual        :: [Expr]
                 , values_list :: [[Expr]]
+                }
+              | CTESCAN
+                { targetlist :: [TargetEntry]
+                , qual       :: [Expr]
+                , ctename    :: String
+                , recursive  :: Bool
+                , initPlan   :: [Integer]
                 }
               | HASH
                 { targetlist :: [TargetEntry]
