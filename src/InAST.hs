@@ -13,7 +13,9 @@ module InAST ( Operator(..)
              , SetOpStrategy(..)
              , Expr(..)
              , JoinType(..)
-             , NestLoopParam(..) ) where
+             , NestLoopParam(..)
+             , FrameOptions(..)
+             , frameOptionToBits ) where
 
 data Operator = SEQSCAN
                 { targetlist   :: [TargetEntry]
@@ -90,6 +92,16 @@ data Operator = SEQSCAN
                 { targetlist  :: [TargetEntry]
                 , operator    :: Operator
                 , groupCols   :: [Integer]
+                }
+              | WINDOWAGG
+                { targetlist :: [TargetEntry]
+                , operator   :: Operator
+                , winrefId   :: Integer
+                , ordEx      :: [SortEx]
+                , groupCols  :: [Integer]
+                , frameOptions :: [FrameOptions]
+                , startOffset :: Maybe Expr
+                , endOffset   :: Maybe Expr
                 }
               | MATERIAL
                 { operator :: Operator }
@@ -233,6 +245,13 @@ data Expr = VAR
             , aggfilter     :: Maybe Expr
             , aggstar       :: Bool
             }
+          | WINDOWFUNC
+            { winname   :: String
+            , winargs   :: [Expr]
+            , aggfilter :: Maybe Expr
+            , winref    :: Integer
+            , winstar   :: Bool
+          }
           | AND { args :: [Expr] }
           | OR  { args :: [Expr] }
           | NOT { arg  :: Expr }
@@ -245,3 +264,35 @@ data JoinType = INNER
               | SEMI
               | ANTI
     deriving (Eq, Show)
+
+data FrameOptions = FRAMEOPTION_NONDEFAULT
+                  | FRAMEOPTION_RANGE
+                  | FRAMEOPTION_ROWS
+                  | FRAMEOPTION_BETWEEN
+                  | FRAMEOPTION_START_UNBOUNDED_PRECEDING
+                  | FRAMEOPTION_END_UNBOUNDED_PRECEDING
+                  | FRAMEOPTION_START_UNBOUNDED_FOLLOWING
+                  | FRAMEOPTION_END_UNBOUNDED_FOLLOWING
+                  | FRAMEOPTION_START_CURRENT_ROW
+                  | FRAMEOPTION_END_CURRENT_ROW
+                  | FRAMEOPTION_START_VALUE_PRECEDING
+                  | FRAMEOPTION_END_VALUE_PRECEDING
+                  | FRAMEOPTION_START_VALUE_FOLLOWING
+                  | FRAMEOPTION_END_VALUE_FOLLOWING
+    deriving (Eq, Show)
+
+frameOptionToBits :: FrameOptions -> Integer
+frameOptionToBits FRAMEOPTION_NONDEFAULT                = 0x1
+frameOptionToBits FRAMEOPTION_RANGE                     = 0x2
+frameOptionToBits FRAMEOPTION_ROWS                      = 0x4
+frameOptionToBits FRAMEOPTION_BETWEEN                   = 0x8
+frameOptionToBits FRAMEOPTION_START_UNBOUNDED_PRECEDING = 0x10
+frameOptionToBits FRAMEOPTION_END_UNBOUNDED_PRECEDING   = 0x20
+frameOptionToBits FRAMEOPTION_START_UNBOUNDED_FOLLOWING = 0x40
+frameOptionToBits FRAMEOPTION_END_UNBOUNDED_FOLLOWING   = 0x80
+frameOptionToBits FRAMEOPTION_START_CURRENT_ROW         = 0x100
+frameOptionToBits FRAMEOPTION_END_CURRENT_ROW           = 0x200
+frameOptionToBits FRAMEOPTION_START_VALUE_PRECEDING     = 0x400
+frameOptionToBits FRAMEOPTION_END_VALUE_PRECEDING       = 0x800
+frameOptionToBits FRAMEOPTION_START_VALUE_FOLLOWING     = 0x1000
+frameOptionToBits FRAMEOPTION_END_VALUE_FOLLOWING       = 0x2000

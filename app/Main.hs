@@ -990,6 +990,50 @@ setop1 = A.SETOP
         , A.firstFlag = 0
         }
 
+windowfunc1 :: A.Operator
+windowfunc1 = A.WINDOWAGG
+              { A.targetlist =
+                [ A.TargetEntry
+                  { A.targetexpr =
+                      A.WINDOWFUNC
+                      { A.winname = "sum"
+                      , A.winargs =
+                        [ A.VAR "OUTER_VAR" "a" ]
+                      , A.aggfilter = Nothing
+                      , A.winref = 1
+                      , A.winstar = False
+                      }
+                  , A.targetresname = "foo"
+                  , A.resjunk = False
+                  }
+                ]
+              , A.operator =
+                  A.SEQSCAN
+                  { A.targetlist =
+                    [ A.TargetEntry
+                      { A.targetexpr = A.VAR "grp" "a"
+                      , A.targetresname = "a"
+                      , A.resjunk = False
+                      }
+                    , A.TargetEntry
+                      { A.targetexpr = A.VAR "grp" "b"
+                      , A.targetresname = "b"
+                      , A.resjunk = False
+                      }
+                    ]
+                  , A.qual = []
+                  , A.scanrelation = "grp"
+                  }
+              , A.winrefId = 1
+              , A.ordEx = []
+              , A.groupCols = []
+              , A.frameOptions = [ A.FRAMEOPTION_RANGE
+                                 , A.FRAMEOPTION_START_UNBOUNDED_PRECEDING
+                                 , A.FRAMEOPTION_END_CURRENT_ROW
+                                 ]
+              , A.startOffset = Nothing
+              , A.endOffset = Nothing
+              }
 
 -- access list elements safely
 (!!) :: [a] -> Int -> Maybe a
@@ -1045,4 +1089,4 @@ main = do
     let cp = forceEither config
     let authStr = forceEither $ get cp "Main" "dbauth" :: String
 
-    checkAndGenerate authStr setop1
+    checkAndGenerate authStr windowfunc1

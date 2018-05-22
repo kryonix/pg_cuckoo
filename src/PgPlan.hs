@@ -318,6 +318,19 @@ data Plan = RESULT
             , groupingSets :: Null              -- ^ grouping sets to use
             , chain        :: Null              -- ^ chained Agg/Sort nodes
             }
+          | WINDOWAGG
+            { genericPlan   :: GenericPlan
+            , winref        :: Integer
+            , partNumCols   :: Integer
+            , partColIdx    :: PlainList Integer
+            , partOperators :: PlainList Integer
+            , ordNumCols    :: Integer
+            , ordColIdx     :: PlainList Integer
+            , ordOperators  :: PlainList Integer
+            , frameOptions  :: Integer
+            , startOffset   :: Maybe Expr
+            , endOffset     :: Maybe Expr
+            }
           | MATERIAL
             { genericPlan :: GenericPlan }
           | NESTLOOP
@@ -569,6 +582,18 @@ data Expr = VAR
             , agglevelsup   :: Integer              -- ^ > 0 if agg belongs to outer query
             , _aggsplit      :: Integer              -- ^ expected agg-splitting mode of parent agg
             , location      :: Integer              -- ^ token location, or -1 if unknown
+            }
+          | WINDOWFUNC
+            { winfnoid    :: Integer
+            , wintype     :: Integer
+            , wincollid   :: Integer
+            , inputcollid :: Integer
+            , args        :: List Expr
+            , aggfilter   :: Maybe Expr
+            , _winref      :: Integer
+            , winstar     :: PgBool
+            , winagg      :: PgBool
+            , location    :: Integer
             }
           | RANGETBLFUNCTION
             { funcexpr :: Expr

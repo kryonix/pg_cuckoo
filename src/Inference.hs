@@ -625,6 +625,56 @@ trOperator (I.AGG {I.targetlist, I.operator, I.groupCols})
               , O.chain        = O.Null
               }
 
+trOperator (I.WINDOWAGG {I.targetlist, I.operator, I.winrefId, I.ordEx, I.groupCols, I.frameOptions, I.startOffset, I.endOffset})
+  = do
+    context <- lift $ ask
+    operator' <- trOperator operator
+
+    -- OUTER_PLAN = first of appendplans
+    -- Generate a fake table with fake columns.
+    -- We need this to perform inference of VAR, referencing
+    -- sub-operators.
+    let fakeTable = createFakeTable "OUTER_VAR" (O.targetlist $ O.genericPlan operator')
+    -- Get rid of existing fake-tables (maybe not required?)
+    let rtablesC = dropWhile (\(PgTable {tOID}) -> tOID == -1) $ rtables context
+    let context' = context {rtables=fakeTable:rtablesC}
+
+    targetlist' <- local (const context') $ mapM trTargetEntry $ zip targetlist [1..]
+
+    startOffset' <- local (const context') $ mapM trExpr startOffset
+    endOffset'   <- local (const context') $ mapM trExpr endOffset
+
+    let grpTargets = map (getExprType . O.expr)
+                          $ filter (\(O.TARGETENTRY {O.ressortgroupref=x}) -> x `elem` groupCols) targetlist'
+
+    -- Try to find function in pg_operator by name and argument types
+    ops <- mapM ((liftM fst) . searchOperator) $ zip grpTargets (repeat "=")
+
+    opnos <- mapM (trSortEx targetlist') ordEx
+
+    when (null opnos && not (null ordEx)) $ error "no opnos found"
+
+    let sortOperators = O.PlainList $ map O.sortop opnos
+    let sortColIdx    = O.PlainList $ map I.sortTarget ordEx
+
+    return $ O.WINDOWAGG
+              { O.genericPlan =
+                  O.defaultPlan
+                    { O.targetlist = O.List targetlist'
+                    , O.lefttree   = Just operator'
+                    }
+              , O.winref = winrefId
+              , O.partNumCols = fromIntegral $ length groupCols
+              , O.partColIdx  = O.PlainList groupCols
+              , O.partOperators = O.PlainList ops
+              , O.ordNumCols    = fromIntegral $ length ordEx
+              , O.ordColIdx     = sortColIdx
+              , O.ordOperators  = sortOperators
+              , O.frameOptions  = sum $ map I.frameOptionToBits frameOptions
+              , O.startOffset   = startOffset'
+              , O.endOffset     = endOffset'
+              }
+
 trOperator (I.MATERIAL {I.operator})
   = do
     operator' <- trOperator operator
@@ -1360,6 +1410,74 @@ trExpr n@(I.AGGREF {I.aggname, I.aggargs, I.aggdirectargs, I.aggorder, I.aggdist
             , O._aggsplit     = 0
             , O.location      = -1
             }
+
+trExpr n@(I.WINDOWFUNC {I.winname, I.winargs, I.aggfilter, I.winref, I.winstar})
+  = do
+    -- Compile args first, because we need the types to select the row in pg_proc
+    args' <- mapM trExpr winargs
+    let argTypes = map getExprType args'
+
+    let proallargtypesDB x = DB.safeFromSql $ x M.! "proallargtypes" :: ConvertResult String
+    let proallargtypes p = case proallargtypesDB p of
+                            -- Second chance if conversion of proallargtypes fails.
+                            Left x -> fromSql $ p M.! "proargtypes"
+                            Right x -> x
+
+    let proallargtypesSplit x = if (all isJust proallargtypes')
+                                  then catMaybes proallargtypes'
+                                  else error $ "getProcData error while reading proallargtypes: " ++ show x
+          where proallargtypes' = (map TR.readMaybe $ words (proallargtypes x) :: [Maybe Integer])
+    -- Get tables from context, we have to do it that way instead of via
+    -- findRow, because we need to perform a search using multiple qualifications.
+    td <- getRTableData ()
+    let table = pg_proc td
+    -- Try to find function in pg_operator by name and argument types
+    let procrow = filter (\x -> x M.! "proname" == (DB.toSql winname)
+                         && x M.! "pronargs" == (DB.toSql (length args'))
+                         -- && x M.! "proisagg" == (DB.toSql True)
+                         && proallargtypesSplit x == argTypes) table
+
+    -- Error if the function does not exist
+    when (null procrow) $ error $ "WINFUNC: function " ++ winname ++ " not found."
+    -- Extract all information we need
+    let prooid      = fromSql $ head procrow M.! "oid"
+    let prorettype  = fromSql $ head procrow M.! "prorettype"
+    -- let proretset   = fromSql $ head procrow M.! "proretset"
+    -- let provariadic = fromSql $ head procrow M.! "provariadic"
+    let pronargs    = fromSql $ head procrow M.! "pronargs"
+    let proisagg    = fromSql $ head procrow M.! "proisagg"
+
+    -- Check if argument count is correct. Error if mismatch
+    when (pronargs /= length winargs)
+      $ error $ "AGGREF error: expected "
+                ++ show pronargs 
+                ++ " arguments but got "
+                ++ show (length winargs)
+                ++ "\n" ++ PP.ppShow n
+
+    -- Try to find function in pg_proc by name
+    aggrow <- getRTableRow (pg_aggregate, findRow "oid" prooid)
+
+    when (null aggrow)
+      $ error $ "AGGREF error: aggrow not found: " ++ show prooid
+
+    -- Query argument types for type check
+    let aggargtypes = O.RelationList $ proallargtypesSplit (head procrow)
+
+    aggfilter'     <- mapM trExpr aggfilter
+
+    return $ O.WINDOWFUNC
+              { O.winfnoid = prooid
+              , O.wintype  = prorettype
+              , O.wincollid = 0
+              , O.inputcollid = 0
+              , O.args = O.List args'
+              , O.aggfilter = aggfilter'
+              , O._winref = winref
+              , O.winstar = O.PgBool winstar
+              , O.winagg  = O.PgBool proisagg
+              , O.location = -1
+              }
 
 trExpr (I.AND { I.args })
   = do

@@ -129,6 +129,13 @@ extract op = let
     mapM_ (~~~>) targetlist
     (~>) operator
 
+(~>) (WINDOWAGG {targetlist, operator, frameOptions, startOffset, endOffset})
+  = do
+    mapM_ (~~~>) targetlist
+    (~>) operator
+    mapM_ (~~>) startOffset
+    mapM_ (~~>) endOffset
+
 (~>) (MATERIAL {operator}) = (~>) operator
 
 (~>) (NESTLOOP {targetlist, joinquals, nestParams, lefttree, righttree})
@@ -214,6 +221,11 @@ extract op = let
   = do
     mapM_ (~~~>) aggargs
     mapM_ (~~>) aggdirectargs
+    mapM_ (~~>) aggfilter
+
+(~~>) (WINDOWFUNC {winargs, aggfilter})
+  = do
+    mapM_ (~~>) winargs
     mapM_ (~~>) aggfilter
 
 (~~>) (AND { args }) = mapM_ (~~>) args

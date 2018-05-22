@@ -172,6 +172,15 @@ validateExpr op = let
     mapM_ (~~~>) targetlist
     (~>) operator
 
+(~>) (WINDOWAGG {targetlist, operator, frameOptions, startOffset, endOffset})
+  = do
+    when (null frameOptions)
+      $ logError "WiNDOWAGG error: no frameOptions specified"
+    mapM_ (~~~>) targetlist
+    (~>) operator
+    mapM_ (~~>) startOffset
+    mapM_ (~~>) endOffset
+
 (~>) (MATERIAL {operator}) = (~>) operator
 
 (~>) (NESTLOOP {targetlist, joinquals, nestParams, lefttree, righttree})
@@ -290,6 +299,12 @@ validateExpr op = let
                   ++ show (length oprargs)
                   ++ "\n" ++ PP.ppShow o
     mapM_ (~~>) oprargs
+
+(~~>) (WINDOWFUNC {winname, winargs, aggfilter})
+  = do
+    when (null winname) $ logError "WINDOWFUNC error: winname is empty"
+    mapM_ (~~>) winargs
+    mapM_ (~~>) aggfilter
 
 (~~>) o@(AGGREF { aggname, aggargs, aggdirectargs, aggfilter })
   = do
