@@ -104,6 +104,18 @@ extract op = let
     mapM_ (~~~>) targetlist
     mapM_ (~>) mergeplans
 
+(~>) (RECURSIVEUNION {targetlist, lefttree, righttree})
+  = do
+    mapM_ (~~~>) targetlist
+    (~>) lefttree
+    (~>) righttree
+
+(~>) w@(WORKTABLESCAN {targetlist, qual})
+  = do
+    logScan w
+    mapM_ (~~~>) targetlist
+    mapM_ (~~>) qual
+
 (~>) (BITMAPAND { bitmapplans }) = mapM_ (~>) bitmapplans
 (~>) (BITMAPOR { bitmapplans }) = mapM_ (~>) bitmapplans
 

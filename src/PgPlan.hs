@@ -272,6 +272,19 @@ data Plan = RESULT
             , collations       :: PlainList Integer
             , nullsFirst       :: PlainList PgBool
             }
+          | RECURSIVEUNION
+            { genericPlan  :: GenericPlan
+            , wtParam      :: Integer
+            , numCols      :: Integer
+            , dupColIdx    :: PlainList Integer
+            , dupOperators :: PlainList Integer
+            , numGroups    :: Integer
+            }
+          | WORKTABLESCAN
+            { genericPlan :: GenericPlan
+            , scanrelid   :: Integer
+            , wtParam     :: Integer
+            }
           | BITMAPAND
             { genericPlan :: GenericPlan
             , bitmapplans :: List Plan
@@ -425,7 +438,7 @@ data Plan = RESULT
             , unknownEqFalse    :: PgBool
             , _parallel_safe     :: PgBool
             , setParam          :: IndexList
-            , perParam          :: IndexList
+            , parParam          :: IndexList
             , __args              :: List Expr
             , _startup_cost      :: Double
             , per_call_cost     :: Double

@@ -62,6 +62,19 @@ data Operator = SEQSCAN
                 , mergeplans :: [Operator]
                 , sortCols    :: [SortEx]
                 }
+              | RECURSIVEUNION
+                { targetlist :: [TargetEntry]
+                , lefttree   :: Operator
+                , righttree  :: Operator
+                , wtParam    :: Integer
+                , unionall   :: Bool
+                , ctename    :: String
+                }
+              | WORKTABLESCAN
+                { targetlist   :: [TargetEntry]
+                , qual         :: [Expr]
+                , wtParam      :: Integer
+                }
               | BITMAPAND
                 { bitmapplans :: [Operator] }
               | BITMAPOR

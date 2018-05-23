@@ -130,19 +130,25 @@ trPlannedStmt (I.PlannedStmt op subplan) tbls valuesScan = do
   tables <- mapM accessPgClass tbls
   context <- lift $ ask
 
-  subplan' <- mapM trOperator subplan
+  let numTables = length tbls
+  let context'' = const $ context { rtables=tables
+                                 , valueScans= map (\(a, b) -> (a, fromIntegral b)) 
+                                                $ zip valuesScan [numTables..numTables+(length valuesScan)]
+                                 }
+
+  subplan' <- local context'' $ mapM trOperator subplan
 
   subplan'' <- do
     let plans'' = zip [1..] subplan'
     let plans''' = map (\(n, x) -> x {O.genericPlan=(O.genericPlan x) {O.plan_node_id=n}}) plans''
     return plans'''
 
-  let numTables = length tbls
   let context' = const $ context { rtables=tables
                                  , valueScans= map (\(a, b) -> (a, fromIntegral b)) 
                                                 $ zip valuesScan [numTables..numTables+(length valuesScan)]
                                  , subplanLst = subplan''
                                  }
+
   res <- local context' $ trOperator op
 
   let rte    = map pgTableToRTE tables
@@ -208,6 +214,29 @@ scanToRTE (I.SUBQUERYSCAN {I.targetlist})
   where
     colnum = length $ targetlist
     erefA = O.Alias { O.aliasname = "SUBQUERY"
+                    , O.colnames  = O.List $ ["column"++show x | x <- [1..colnum]]
+                    }
+
+scanToRTE (I.WORKTABLESCAN {I.targetlist})
+  = O.RTE_SUBQUERY
+      { O.alias = Nothing
+      , O.eref = erefA
+      , O.rtekind = 1
+      , O.subquery = O.Null
+      , O.security_barrier = O.PgBool False
+      , O.lateral = O.PgBool False
+      , O.inh = O.PgBool False
+      , O.inFromCl = O.PgBool False
+      , O.requiredPerms = 0
+      , O.checkAsUser = 0
+      , O.selectedCols = O.Bitmapset []
+      , O.insertedCols = O.Bitmapset []
+      , O.updatedCols  = O.Bitmapset []
+      , O.securityQuals = O.Null
+      }
+  where
+    colnum = length $ targetlist
+    erefA = O.Alias { O.aliasname = "cte"
                     , O.colnames  = O.List $ ["column"++show x | x <- [1..colnum]]
                     }
 
@@ -479,6 +508,70 @@ trOperator (I.MERGEAPPEND { I.targetlist, I.mergeplans, I.sortCols })
               , O.sortOperators = sortOperators
               , O.collations = collations
               , O.nullsFirst = nullsFirst
+              }
+
+trOperator (I.RECURSIVEUNION {I.targetlist, I.lefttree, I.righttree, I.wtParam, I.unionall, I.ctename})
+  = do
+    context <- lift $ ask
+    lefttree' <- trOperator lefttree
+    let fakeInner = createFakeTable ctename (O.targetlist $ O.genericPlan lefttree')
+
+    let rtablesC = rtables context
+    let context'' = context {rtables=fakeInner:rtablesC}
+
+    righttree' <- local (const context'') $ trOperator righttree
+
+    let fakeOuter = createFakeTable "OUTER_VAR" (O.targetlist $ O.genericPlan righttree')
+    let fakeTables = [fakeOuter]
+
+    let context' = context {rtables=fakeTables++rtablesC}
+
+    targetlist' <- local (const context') $ mapM trTargetEntry $ zip targetlist [1..]
+
+    let grpTargets = map (getExprType . O.expr) targetlist'
+
+    -- Try to find function in pg_operator by name and argument types
+    ops <- mapM ((liftM fst) . searchOperator) $ zip grpTargets (repeat "=")
+
+    let (numCols, dupColIdx, dupOperators)
+          = if unionall
+              then (0, O.PlainList [], O.PlainList [])
+              else ( fromIntegral (length targetlist')
+                   , O.PlainList $ map O.ressortgroupref targetlist'
+                   , O.PlainList ops
+                   )
+
+    incrParam 1
+
+    return $ O.RECURSIVEUNION
+              { O.genericPlan =
+                  O.defaultPlan
+                  { O.targetlist = O.List targetlist'
+                  , O.lefttree   = Just lefttree'
+                  , O.righttree  = Just righttree'
+                  }
+              , O.wtParam = wtParam
+              , O.numCols = numCols
+              , O.dupColIdx = dupColIdx
+              , O.dupOperators = dupOperators
+              , O.numGroups = 0
+              }
+
+trOperator (I.WORKTABLESCAN {I.targetlist, I.qual, I.wtParam})
+  = do
+    targetlist' <- mapM trTargetEntry $ zip targetlist [1..]
+    qual'       <- mapM trExpr qual
+
+    return $ O.WORKTABLESCAN
+              { O.genericPlan =
+                  O.defaultPlan
+                    { O.targetlist = O.List targetlist'
+                    , O.qual       = O.List qual'
+                    , O.extParam   = O.Bitmapset [wtParam]
+                    , O.allParam   = O.Bitmapset [wtParam]
+                    }
+              , O.scanrelid = -1 -- not required?
+              , O.wtParam   = wtParam
               }
 
 trOperator (I.BITMAPAND { I.bitmapplans })
@@ -919,6 +1012,9 @@ trOperator s@(I.SUBQUERYSCAN {I.targetlist, I.qual, I.subplan})
 
 
     vscans <- getValueScans ()
+    let filtered = filter ((==s) . fst) vscans
+    when (null filtered)
+      $ error $ "empty result?\n" ++ PP.ppShow vscans
     let rel:_ = filter ((==s) . fst) vscans
     let relid = snd rel
 
@@ -1083,16 +1179,18 @@ trOperator s@(I.CTESCAN {I.targetlist, I.qual, I.ctename, I.recursive, I.initPla
     let rel:_ = filter ((==s) . fst) vscans
     let relid = snd rel
 
+    p <- fetchParamCnt ()
+
     return $ O.CTESCAN
               { O.genericPlan =
                   O.defaultPlan
                     { O.targetlist = O.List targetlist'
                     , O.initPlan   = O.List subplans'
-                    , O.allParam   = O.Bitmapset $ if null initPlan then [] else [0..fromIntegral (length initPlan)]
+                    , O.allParam   = O.Bitmapset [p] -- $ if null initPlan then [] else [0..fromIntegral (length initPlan)]
                     }
               , O.scanrelid = relid
               , O.ctePlanId = head initPlan
-              , O.cteParam  = 0
+              , O.cteParam  = p -- head initPlan
               }
 
 trOperator s@(I.HASH {I.targetlist, I.qual, I.operator, I.skewTable, I.skewColumn})
@@ -1312,7 +1410,7 @@ trSubPlan name (n, x) = do
               , O.unknownEqFalse    = O.PgBool False
               , O._parallel_safe    = O.PgBool False
               , O.setParam          = O.IndexList []
-              , O.perParam          = O.IndexList []
+              , O.parParam          = O.IndexList []
               , O.__args            = O.List []
               , O._startup_cost     = 0.0
               , O.per_call_cost     = 0.0

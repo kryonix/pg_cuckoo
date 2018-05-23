@@ -1065,6 +1065,76 @@ ctescan1 = A.PlannedStmt
               ]
             }
 
+recursive1 :: A.PlannedStmt
+recursive1 = A.PlannedStmt
+              { A.planTree =
+                  A.CTESCAN
+                  { A.targetlist =
+                    [ A.TargetEntry
+                      { A.targetexpr = A.SCANVAR 1
+                      , A.targetresname = "x"
+                      , A.resjunk = False
+                      }
+                    ]
+                  , A.qual = []
+                  , A.ctename = "num"
+                  , A.recursive = False
+                  , A.initPlan = [1]
+                  }
+              , A.subplans =
+                [ A.RECURSIVEUNION
+                  { A.targetlist =
+                    [ A.TargetEntry
+                      { A.targetexpr = A.VAR "OUTER_VAR" "x"
+                      , A.targetresname = "x"
+                      , A.resjunk = False
+                      }
+                    ]
+                  , A.lefttree =
+                      A.RESULT
+                      { A.targetlist =
+                          [ A.TargetEntry
+                              { A.targetexpr = A.CONST "1" "int4"
+                              , A.targetresname = "x"
+                              , A.resjunk = False
+                              }
+                          ]
+                      , A.resconstantqual = Nothing
+                      }
+                  , A.righttree =
+                      A.WORKTABLESCAN
+                      { A.targetlist =
+                        [ A.TargetEntry
+                          { A.targetexpr =
+                              A.OPEXPR
+                              { A.oprname = "+"
+                              , A.oprargs =
+                                [ A.VAR "num" "x"
+                                , A.CONST "1" "int4"
+                                ]
+                              }
+                          , A.targetresname = "x"
+                          , A.resjunk = False
+                          }
+                        ]
+                      , A.qual =
+                          [ A.OPEXPR
+                            { A.oprname = "<"
+                            , A.oprargs =
+                              [ A.VAR "num" "x"
+                              , A.CONST "10" "int4"
+                              ]
+                            }
+                          ]
+                      , A.wtParam = 0
+                      }
+                  , A.wtParam = 0
+                  , A.unionall = False
+                  , A.ctename = "num"
+                  }
+                ]
+              }
+
 -- access list elements safely
 (!!) :: [a] -> Int -> Maybe a
 (!!) lst idx = if idx >= length lst
@@ -1156,4 +1226,4 @@ main = do
     let authStr = forceEither $ get cp "Main" "dbauth" :: String
 
     -- checkAndGenerate authStr ctescan1
-    checkAndGenerateStmt authStr ctescan1
+    checkAndGenerateStmt authStr recursive1

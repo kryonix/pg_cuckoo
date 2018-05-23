@@ -132,6 +132,19 @@ validateExpr op = let
     mapM_ (~~~>) targetlist
     mapM_ (~>) mergeplans
 
+(~>) (RECURSIVEUNION {targetlist, lefttree, righttree, ctename})
+  = do
+    when (null ctename)
+      $ logError $ "RECURSIVEUNION: ctename not specified"
+    mapM_ (~~~>) targetlist
+    (~>) lefttree
+    (~>) righttree
+
+(~>) (WORKTABLESCAN {targetlist, qual})
+  = do
+    mapM_ (~~~>) targetlist
+    mapM_ (~~>) qual
+
 (~>) (BITMAPAND {bitmapplans})
   = do
     when (null bitmapplans)
