@@ -212,7 +212,7 @@ pq_plan_deserialize2(PG_FUNCTION_ARGS)
 
   // Execution is done at this point, print the result of the query
   proc = SPI_processed; // Number of rows
-  elog(INFO, "executed");
+  elog(INFO, "executed, rows: %lu", proc);
 
   /* If no qualifying tuples, fall out early */
   if (ret != SPI_OK_SELECT || proc == 0)
@@ -331,7 +331,7 @@ pq_plan_deserialize(PG_FUNCTION_ARGS)
 
   // Execution is done at this point, print the result of the query
   proc = SPI_processed; // Number of rows
-  elog(INFO, "executed");
+  elog(INFO, "executed, rows: %lu", proc);
 
   if (ret > 0 && SPI_tuptable != NULL)
   {
@@ -405,7 +405,7 @@ pq_plan_explain(PG_FUNCTION_ARGS)
     PG_TRY();
     {
       ExplainOnePlan((PlannedStmt *)plan, NULL,
-             es, NULL, 
+             es, "select 1", 
 #if PG_VERSION_NUM >= 100000
              NULL, create_queryEnv(), NULL);
 #else
