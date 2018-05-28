@@ -408,6 +408,16 @@ data Plan = RESULT
             , single_copy  :: PgBool
             , invisible    :: PgBool
             }
+          | GATHERMERGE
+            { genericPlan   :: GenericPlan
+            , num_workers   :: Integer
+            , rescan_param  :: Integer
+            , numCols       :: Integer
+            , sortColIdx    :: PlainList Integer
+            , sortOperators :: PlainList Integer
+            , collations    :: PlainList Integer
+            , nullsFirst    :: PlainList PgBool
+            }
           | HASH
             { genericPlan :: GenericPlan
             , skewTable   :: Integer

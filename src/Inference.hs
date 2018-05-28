@@ -398,8 +398,20 @@ trOperator n@(I.LIMIT { I.operator, I.limitOffset, I.limitCount })
 
 trOperator n@(I.SORT { I.targetlist, I.operator, I.sortCols })
   = do
-    targetlist' <- mapM trTargetEntry $ zip targetlist [1..]
-    operator'   <- trOperator operator
+    context <- lift $ ask
+    operator' <- trOperator operator
+
+    -- OUTER_PLAN = first of appendplans
+    -- Generate a fake table with fake columns.
+    -- We need this to perform inference of VAR, referencing
+    -- sub-operators.
+    let fakeTable = createFakeTable "OUTER_VAR" (O.targetlist $ O.genericPlan operator')
+    -- Get rid of existing fake-tables (maybe not required?)
+    let rtablesC = dropWhile (\(PgTable {tOID}) -> tOID == -1) $ rtables context
+    let context' = context {rtables=fakeTable:rtablesC}
+
+    targetlist' <- local (const context') $ mapM trTargetEntry $ zip targetlist [1..]
+
 
     let numCols = length sortCols
 
@@ -1226,7 +1238,7 @@ trOperator (I.GATHER {I.targetlist, I.operator, I.num_workers, I.rescan_param})
 
     incrParam 1
     setParallelMode True
-    
+
     return $ O.GATHER
               { O.genericPlan =
                   O.defaultPlan
@@ -1237,6 +1249,56 @@ trOperator (I.GATHER {I.targetlist, I.operator, I.num_workers, I.rescan_param})
               , O.rescan_param = rescan_param
               , O.single_copy = O.PgBool False
               , O.invisible   = O.PgBool False
+              }
+
+trOperator (I.GATHERMERGE {I.targetlist, I.operator, I.num_workers, I.rescan_param, I.sortCols})
+  = do
+    context <- lift $ ask
+    --rtables <- getRTables ()
+    operator' <- trOperator operator
+    let operator'' = operator' {O.genericPlan = (O.genericPlan operator') {O.parallel_aware=O.PgBool True, O.parallel_safe=O.PgBool True, O.extParam=O.Bitmapset [rescan_param], O.allParam=O.Bitmapset [rescan_param]}}
+    -- OUTER_PLAN = first of appendplans
+    -- Generate a fake table with fake columns.
+    -- We need this to perform inference of VAR, referencing
+    -- sub-operators.
+    let fakeTable = createFakeTable "OUTER_VAR" (O.targetlist $ O.genericPlan operator')
+    -- Get rid of existing fake-tables (maybe not required?)
+    let rtablesC = dropWhile (\(PgTable {tOID}) -> tOID == -1) $ rtables context
+    let context' = context {rtables=fakeTable:rtablesC}
+
+    targetlist' <- local (const context') $ mapM trTargetEntry $ zip targetlist [1..]
+
+    incrParam 1
+    setParallelMode True
+    
+    let numCols = length sortCols
+
+    when (length targetlist' < numCols)
+      $ error $ "SORT: more sortCols than targetlist entries defined."
+
+    let collations = O.PlainList $ replicate numCols 0
+    let nullsFirst = O.PlainList $ map (O.PgBool . I.sortNullsFirst) sortCols
+
+    opnos <- mapM (trSortEx targetlist') sortCols
+
+    when (null opnos) $ error "no opnos found"
+
+    let sortOperators = O.PlainList $ map O.sortop opnos
+    let sortColIdx    = O.PlainList $ map I.sortTarget sortCols
+
+    return $ O.GATHERMERGE
+              { O.genericPlan =
+                  O.defaultPlan
+                  { O.targetlist = O.List targetlist'
+                  , O.lefttree   = Just operator''
+                  }
+              , O.num_workers   = num_workers
+              , O.rescan_param  = rescan_param
+              , O.numCols       = fromIntegral numCols
+              , O.sortColIdx    = sortColIdx
+              , O.sortOperators = sortOperators
+              , O.collations    = collations
+              , O.nullsFirst    = nullsFirst
               }
 
 trOperator s@(I.HASH {I.targetlist, I.qual, I.operator, I.skewTable, I.skewColumn})

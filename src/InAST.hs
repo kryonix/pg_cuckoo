@@ -178,10 +178,13 @@ data Operator = SEQSCAN
                 , operator     :: Operator
                 , rescan_param :: Integer
                 }
-              -- | GATHERMERGE
-              --   { targetlist :: [TargetEntry]
-              --   , num_workers :: Integer
-              --   ,  }
+              | GATHERMERGE
+                { targetlist   :: [TargetEntry]
+                , num_workers  :: Integer
+                , operator     :: Operator
+                , rescan_param :: Integer
+                , sortCols     :: [SortEx]
+                }
               | HASH
                 { targetlist :: [TargetEntry]
                 , qual       :: [Expr]

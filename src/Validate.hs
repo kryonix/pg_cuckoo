@@ -272,6 +272,12 @@ validateExpr op = let
     mapM_ (~~~>) targetlist
     (~>) operator
 
+(~>) (GATHERMERGE {targetlist, operator})
+  = do
+    mapM_ (~~~>) targetlist
+    (~>) operator
+
+
 (~>) (HASH {targetlist, qual, operator, skewTable})
   = do
     when (null skewTable)

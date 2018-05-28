@@ -1165,18 +1165,85 @@ gather1 = A.GATHER
                 }
               ]
             , A.qual = 
-              [ A.OPEXPR
+              [ {-A.OPEXPR
                 { A.oprname = "="
                 , A.oprargs =
                   [ A.VAR "indexed" "c"
                   , A.CONST "0.42" "numeric"
                   ]
-                }
+                }-}
               ]
             , A.scanrelation = "indexed"
             }
           , A.rescan_param = 0
           }
+
+gathermerge1 :: A.Operator
+gathermerge1 = A.GATHERMERGE
+                { A.targetlist =
+                  [ A.TargetEntry
+                    { A.targetexpr = A.VAR "OUTER_VAR" "a"
+                    , A.targetresname = "a"
+                    , A.resjunk = False
+                    }
+                  , A.TargetEntry
+                    { A.targetexpr = A.VAR "OUTER_VAR" "b"
+                    , A.targetresname = "b"
+                    , A.resjunk = False 
+                    }
+                  , A.TargetEntry
+                    { A.targetexpr = A.VAR "OUTER_VAR" "c"
+                    , A.targetresname = "c"
+                    , A.resjunk = False 
+                    }
+                  ]
+                , A.num_workers = 999
+                , A.operator =
+                    A.SORT
+                    { A.targetlist =
+                      [ A.TargetEntry
+                        { A.targetexpr = A.VAR "OUTER_VAR" "a"
+                        , A.targetresname = "a"
+                        , A.resjunk = False
+                        }
+                      , A.TargetEntry
+                        { A.targetexpr = A.VAR "OUTER_VAR" "b"
+                        , A.targetresname = "b"
+                        , A.resjunk = False 
+                        }
+                      , A.TargetEntry
+                        { A.targetexpr = A.VAR "OUTER_VAR" "c"
+                        , A.targetresname = "c"
+                        , A.resjunk = False 
+                        }
+                      ]
+                    , A.operator =
+                        A.SEQSCAN
+                        { A.targetlist =
+                          [ A.TargetEntry
+                            { A.targetexpr = A.VAR "indexed" "a"
+                            , A.targetresname = "a"
+                            , A.resjunk = False
+                            }
+                          , A.TargetEntry
+                            { A.targetexpr = A.VAR "indexed" "b"
+                            , A.targetresname = "b"
+                            , A.resjunk = False 
+                            }
+                          , A.TargetEntry
+                            { A.targetexpr = A.VAR "indexed" "c"
+                            , A.targetresname = "c"
+                            , A.resjunk = False 
+                            }
+                          ]
+                        , A.qual = []
+                        , A.scanrelation = "indexed"
+                        }
+                    , A.sortCols = [ A.SortEx 1 True False ]
+                    }
+                , A.rescan_param = 0
+                , A.sortCols = [ A.SortEx 1 True False ]
+                }
 
 -- access list elements safely
 (!!) :: [a] -> Int -> Maybe a
@@ -1268,5 +1335,5 @@ main = do
     let cp = forceEither config
     let authStr = forceEither $ get cp "Main" "dbauth" :: String
 
-    checkAndGenerate authStr gather1
+    checkAndGenerate authStr gathermerge1
     -- checkAndGenerateStmt authStr recursive1
