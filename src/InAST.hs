@@ -172,6 +172,16 @@ data Operator = SEQSCAN
                 , recursive  :: Bool
                 , initPlan   :: [Integer]
                 }
+              | GATHER
+                { targetlist   :: [TargetEntry]
+                , num_workers  :: Integer
+                , operator     :: Operator
+                , rescan_param :: Integer
+                }
+              -- | GATHERMERGE
+              --   { targetlist :: [TargetEntry]
+              --   , num_workers :: Integer
+              --   ,  }
               | HASH
                 { targetlist :: [TargetEntry]
                 , qual       :: [Expr]

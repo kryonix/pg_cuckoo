@@ -29,7 +29,7 @@ import Debug.Trace
 
 generatePlan :: TableData -> [(I.Expr, O.Expr)] -> [String] -> [I.Operator] -> I.PlannedStmt -> O.PLANNEDSTMT
 generatePlan tableD exprs tableNames valuesScan ast = let
-    (stmt, lg) = runOperSem (trPlannedStmt ast tableNames valuesScan) (StateI 0 0) (C tableD exprs [] [] [])
+    (stmt, lg) = runOperSem (trPlannedStmt ast tableNames valuesScan) (StateI 0 0 False) (C tableD exprs [] [] [])
     res = case stmt of
             Prelude.Left str -> error $ "Inference error: " ++ str
             Prelude.Right a -> a
@@ -86,29 +86,40 @@ logError err = tell (Log [err])
 
 data StateI = StateI { count :: Integer
                      , paramCnt :: Integer
+                     , parallelMode :: Bool
                      }
 
 fresh :: Rule String String
 fresh v = do
   n <- lift $ gets count
-  lift $ modify (\x -> StateI (count x+1) (paramCnt x))
+  lift $ modify (\x -> StateI (count x+1) (paramCnt x) (parallelMode x))
   return (v ++ show n)
 
 freshI :: Rule () Integer
 freshI () = do
   n <- lift $ gets count
-  lift $ modify (\x -> StateI (count x+1) (paramCnt x))
+  lift $ modify (\x -> StateI (count x+1) (paramCnt x) (parallelMode x))
   return n
 
 incrParam :: Rule Integer ()
 incrParam i = do
-  lift $ modify (\x -> StateI (count x) (paramCnt x + i))
+  lift $ modify (\x -> StateI (count x) (paramCnt x + i) (parallelMode x))
+  return ()
+
+setParallelMode :: Rule Bool ()
+setParallelMode b = do
+  lift $ modify (\x -> StateI (count x) (paramCnt x) b)
   return ()
 
 fetchParamCnt :: Rule () Integer
 fetchParamCnt () = do
   n <- lift $ gets paramCnt
   return n
+
+fetchParallelMode :: Rule () Bool
+fetchParallelMode () = do
+  b <- lift $ gets parallelMode
+  return b
 
 -- / STATE MONAD SECTION
 --------------------------------------------------------------------------------
@@ -160,11 +171,14 @@ trPlannedStmt (I.PlannedStmt op subplan) tbls valuesScan = do
   -- otherwise postgres crashes.
   params <- fetchParamCnt ()
 
+  parellelMode <- fetchParallelMode ()
+
   return $ O.defaultPlannedStmt 
             { O.planTree = res
             , O.rtable=rtable
             , O.subplans= O.List subplan''
             , O.nParamExec = params
+            , O.parallelModeNeeded = O.PgBool parellelMode
             }
 
 pgTableToRTE :: PgTable -> O.RangeEx
@@ -1193,6 +1207,38 @@ trOperator s@(I.CTESCAN {I.targetlist, I.qual, I.ctename, I.recursive, I.initPla
               , O.cteParam  = p -- head initPlan
               }
 
+trOperator (I.GATHER {I.targetlist, I.operator, I.num_workers, I.rescan_param})
+  = do
+    context <- lift $ ask
+    --rtables <- getRTables ()
+    operator' <- trOperator operator
+    let operator'' = operator' {O.genericPlan = (O.genericPlan operator') {O.parallel_aware=O.PgBool True, O.parallel_safe=O.PgBool True, O.extParam=O.Bitmapset [rescan_param], O.allParam=O.Bitmapset [rescan_param]}}
+    -- OUTER_PLAN = first of appendplans
+    -- Generate a fake table with fake columns.
+    -- We need this to perform inference of VAR, referencing
+    -- sub-operators.
+    let fakeTable = createFakeTable "OUTER_VAR" (O.targetlist $ O.genericPlan operator')
+    -- Get rid of existing fake-tables (maybe not required?)
+    let rtablesC = dropWhile (\(PgTable {tOID}) -> tOID == -1) $ rtables context
+    let context' = context {rtables=fakeTable:rtablesC}
+
+    targetlist' <- local (const context') $ mapM trTargetEntry $ zip targetlist [1..]
+
+    incrParam 1
+    setParallelMode True
+    
+    return $ O.GATHER
+              { O.genericPlan =
+                  O.defaultPlan
+                  { O.targetlist = O.List targetlist'
+                  , O.lefttree   = Just operator''
+                  }
+              , O.num_workers = num_workers
+              , O.rescan_param = rescan_param
+              , O.single_copy = O.PgBool False
+              , O.invisible   = O.PgBool False
+              }
+
 trOperator s@(I.HASH {I.targetlist, I.qual, I.operator, I.skewTable, I.skewColumn})
   = do
     context <- lift $ ask
@@ -1398,7 +1444,7 @@ trSubPlan name (n, x) = do
     incrParam 1
 
     return $ O.SUBPLAN
-              { O.subLinkType       = 7
+              { O.subLinkType       = 7        -- CTE_SUBLINK
               , O.testexpr          = Nothing
               , O.paramIds          = O.List [n]
               , O.plan_id           = plan_node_id

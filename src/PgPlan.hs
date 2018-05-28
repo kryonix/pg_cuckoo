@@ -401,6 +401,13 @@ data Plan = RESULT
             , ctePlanId   :: Integer
             , cteParam    :: Integer
             }
+          | GATHER
+            { genericPlan  :: GenericPlan
+            , num_workers  :: Integer
+            , rescan_param :: Integer
+            , single_copy  :: PgBool
+            , invisible    :: PgBool
+            }
           | HASH
             { genericPlan :: GenericPlan
             , skewTable   :: Integer
@@ -436,11 +443,11 @@ data Plan = RESULT
             , firstColCollation :: Integer
             , useHashTable      :: PgBool
             , unknownEqFalse    :: PgBool
-            , _parallel_safe     :: PgBool
-            , setParam          :: IndexList
-            , parParam          :: IndexList
-            , __args              :: List Expr
-            , _startup_cost      :: Double
+            , _parallel_safe    :: PgBool
+            , setParam          :: IndexList   -- ^ initplan subqueries have to set these Params for parent plan
+            , parParam          :: IndexList   -- ^ indices of input Params from parent plan
+            , __args            :: List Expr   -- ^ exprs to pass as parParam values
+            , _startup_cost     :: Double
             , per_call_cost     :: Double
             }
     deriving (Eq, Show, Generic, GPrint)

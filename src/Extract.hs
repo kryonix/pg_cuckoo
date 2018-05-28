@@ -208,6 +208,11 @@ extract op = let
     mapM_ (~~~>) targetlist
     mapM_ (~~>) qual
 
+(~>) (GATHER {targetlist, operator})
+  = do
+    mapM_ (~~~>) targetlist
+    (~>) operator
+
 (~>) (HASH {targetlist, qual, operator, skewTable})
   = do
     logTable skewTable

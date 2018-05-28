@@ -1135,6 +1135,49 @@ recursive1 = A.PlannedStmt
                 ]
               }
 
+gather1 :: A.Operator
+gather1 = A.GATHER
+          { A.targetlist =
+            [ A.TargetEntry
+              { A.targetexpr = A.VAR "OUTER_VAR" "a"
+              , A.targetresname = "a"
+              , A.resjunk = False
+              }
+            , A.TargetEntry
+              { A.targetexpr = A.VAR "OUTER_VAR" "b"
+              , A.targetresname = "b"
+              , A.resjunk = False 
+              }
+            ]
+          , A.num_workers = 999
+          , A.operator =
+            A.SEQSCAN
+            { A.targetlist =
+              [ A.TargetEntry
+                { A.targetexpr = A.VAR "indexed" "a"
+                , A.targetresname = "a"
+                , A.resjunk = False
+                }
+              , A.TargetEntry
+                { A.targetexpr = A.VAR "indexed" "b"
+                , A.targetresname = "b"
+                , A.resjunk = False 
+                }
+              ]
+            , A.qual = 
+              [ A.OPEXPR
+                { A.oprname = "="
+                , A.oprargs =
+                  [ A.VAR "indexed" "c"
+                  , A.CONST "0.42" "numeric"
+                  ]
+                }
+              ]
+            , A.scanrelation = "indexed"
+            }
+          , A.rescan_param = 0
+          }
+
 -- access list elements safely
 (!!) :: [a] -> Int -> Maybe a
 (!!) lst idx = if idx >= length lst
@@ -1225,5 +1268,5 @@ main = do
     let cp = forceEither config
     let authStr = forceEither $ get cp "Main" "dbauth" :: String
 
-    -- checkAndGenerate authStr ctescan1
-    checkAndGenerateStmt authStr recursive1
+    checkAndGenerate authStr gather1
+    -- checkAndGenerateStmt authStr recursive1
