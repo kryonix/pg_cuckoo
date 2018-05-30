@@ -1224,7 +1224,7 @@ trOperator (I.GATHER {I.targetlist, I.operator, I.num_workers, I.rescan_param})
     context <- lift $ ask
     --rtables <- getRTables ()
     operator' <- trOperator operator
-    let operator'' = operator' {O.genericPlan = (O.genericPlan operator') {O.parallel_aware=O.PgBool True, O.parallel_safe=O.PgBool True, O.extParam=O.Bitmapset [rescan_param], O.allParam=O.Bitmapset [rescan_param]}}
+    let operator'' = operator' {O.genericPlan = (O.genericPlan operator') {O.extParam=O.Bitmapset [rescan_param], O.allParam=O.Bitmapset [rescan_param]}}
     -- OUTER_PLAN = first of appendplans
     -- Generate a fake table with fake columns.
     -- We need this to perform inference of VAR, referencing
@@ -1256,7 +1256,7 @@ trOperator (I.GATHERMERGE {I.targetlist, I.operator, I.num_workers, I.rescan_par
     context <- lift $ ask
     --rtables <- getRTables ()
     operator' <- trOperator operator
-    let operator'' = operator' {O.genericPlan = (O.genericPlan operator') {O.parallel_aware=O.PgBool True, O.parallel_safe=O.PgBool True, O.extParam=O.Bitmapset [rescan_param], O.allParam=O.Bitmapset [rescan_param]}}
+    let operator'' = operator' {O.genericPlan = (O.genericPlan operator') {O.extParam=O.Bitmapset [rescan_param], O.allParam=O.Bitmapset [rescan_param]}}
     -- OUTER_PLAN = first of appendplans
     -- Generate a fake table with fake columns.
     -- We need this to perform inference of VAR, referencing
@@ -1420,6 +1420,18 @@ trOperator (I.SETOP {I.targetlist, I.qual, I.setopStrategy, I.setOpCmd, I.lefttr
               , O.firstFlag = firstFlag
               , O.numGroups = 0
               }
+
+trOperator (I.PARALLEL {I.operator})
+  = do
+    operator' <- trOperator operator
+    let operator'' = operator' 
+                    { O.genericPlan = 
+                      (O.genericPlan operator') 
+                      { O.parallel_aware=O.PgBool True
+                      , O.parallel_safe=O.PgBool True
+                      }
+                    }
+    return operator''
 
 -- | Takes a list of targetentries and a name to generate a fake table
 -- This table is used for VAR "{INNER,OUTER}_VAR" references.

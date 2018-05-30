@@ -210,6 +210,12 @@ data Operator = SEQSCAN
                 , flagColIdx    :: Integer
                 , firstFlag     :: Integer
                 }
+              {-
+              NOT part of the algebra. Just sets the flags parallel_{safe, aware}
+              to true.
+              -}
+              | PARALLEL
+                { operator :: Operator }
     deriving(Eq, Show)
 
 {-

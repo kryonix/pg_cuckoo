@@ -240,6 +240,8 @@ extract op = let
 
     (~>) lefttree
 
+(~>) (PARALLEL {operator}) = (~>) operator
+
 -- | TargetEntry extract
 (~~~>) :: Rule I.TargetEntry ()
 (~~~>) (I.TargetEntry { targetexpr }) = (~~>) targetexpr

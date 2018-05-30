@@ -310,6 +310,8 @@ validateExpr op = let
 
     (~>) lefttree
 
+(~>) (PARALLEL {operator}) = (~>) operator
+
 -- | TargetEntry validator
 (~~~>) :: Rule I.TargetEntry ()
 (~~~>) (TargetEntry { targetexpr, targetresname })

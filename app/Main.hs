@@ -1151,6 +1151,7 @@ gather1 = A.GATHER
             ]
           , A.num_workers = 999
           , A.operator =
+            A.PARALLEL
             A.SEQSCAN
             { A.targetlist =
               [ A.TargetEntry
@@ -1335,5 +1336,5 @@ main = do
     let cp = forceEither config
     let authStr = forceEither $ get cp "Main" "dbauth" :: String
 
-    checkAndGenerate authStr gathermerge1
+    checkAndGenerate authStr gather1
     -- checkAndGenerateStmt authStr recursive1
