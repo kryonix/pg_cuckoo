@@ -15,6 +15,12 @@ module InAST ( PlannedStmt(..)
              , Expr(..)
              , JoinType(..)
              , NestLoopParam(..)
+             , AggSplit(..)
+             , AggStrategy(..)
+             , aggSplitToInt
+             , aggStrategyToInt
+             , aggSPLIT_INITIAL_SERIAL
+             , aggSPLIT_FINAL_DESERIAL
              , FrameOptions(..)
              , frameOptionToBits ) where
 
@@ -112,6 +118,8 @@ data Operator = SEQSCAN
                 { targetlist  :: [TargetEntry]
                 , operator    :: Operator
                 , groupCols   :: [Integer]
+                , aggstrategy :: AggStrategy
+                , aggsplit    :: [AggSplit]
                 }
               | WINDOWAGG
                 { targetlist :: [TargetEntry]
@@ -310,6 +318,38 @@ data JoinType = INNER
               | SEMI
               | ANTI
     deriving (Eq, Show)
+
+data AggStrategy = AGG_PLAIN
+                 | AGG_SORTED
+                 | AGG_HASHED
+                 | AGG_MIXED
+    deriving(Eq, Show)
+
+data AggSplit = AGGSPLITOP_SIMPLE
+              | AGGSPLITOP_COMBINE
+              | AGGSPLITOP_SKIPFINAL
+              | AGGSPLITOP_SERIALIZE
+              | AGGSPLITOP_DESERIALIZE
+    deriving(Eq, Show)
+
+aggSPLIT_INITIAL_SERIAL :: [AggSplit]
+aggSPLIT_INITIAL_SERIAL = [AGGSPLITOP_SKIPFINAL, AGGSPLITOP_SERIALIZE]
+
+aggSPLIT_FINAL_DESERIAL :: [AggSplit]
+aggSPLIT_FINAL_DESERIAL = [AGGSPLITOP_COMBINE, AGGSPLITOP_DESERIALIZE]
+
+aggStrategyToInt :: AggStrategy -> Integer
+aggStrategyToInt AGG_PLAIN  = 0
+aggStrategyToInt AGG_SORTED = 1
+aggStrategyToInt AGG_HASHED = 2
+aggStrategyToInt AGG_MIXED  = 3
+
+aggSplitToInt :: AggSplit -> Integer
+aggSplitToInt AGGSPLITOP_SIMPLE      = 0x0
+aggSplitToInt AGGSPLITOP_COMBINE     = 0x1
+aggSplitToInt AGGSPLITOP_SKIPFINAL   = 0x2
+aggSplitToInt AGGSPLITOP_SERIALIZE   = 0x4
+aggSplitToInt AGGSPLITOP_DESERIALIZE = 0x8
 
 data FrameOptions = FRAMEOPTION_NONDEFAULT
                   | FRAMEOPTION_RANGE

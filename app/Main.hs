@@ -286,6 +286,8 @@ agg1 = A.AGG
               , A.resconstantqual = Nothing
               }
         , A.groupCols = []
+        , A.aggstrategy = A.AGG_PLAIN
+        , A.aggsplit = [A.AGGSPLITOP_SIMPLE]
         }
 
 agg2 :: A.Operator
@@ -334,6 +336,8 @@ agg2 = A.AGG
               , A.scanrelation = "grp"
               }
         , A.groupCols = []
+        , A.aggstrategy = A.AGG_PLAIN
+        , A.aggsplit = [A.AGGSPLITOP_SIMPLE]
         }
 
 nestLoop1 :: A.Operator
@@ -626,6 +630,8 @@ hashjoin1 = A.HASHJOIN
                   , A.scanrelation = "s"
                   }
                 , A.groupCols = [1]
+                , A.aggstrategy = A.AGG_HASHED
+                , A.aggsplit = [A.AGGSPLITOP_SIMPLE]
                 }
               , A.skewTable = "grp"
               , A.skewColumn = 1
@@ -1200,7 +1206,7 @@ gathermerge1 = A.GATHERMERGE
                   ]
                 , A.num_workers = 999
                 , A.operator =
-                    A.SORT
+                    A.PARALLEL A.SORT
                     { A.targetlist =
                       [ A.TargetEntry
                         { A.targetexpr = A.VAR "OUTER_VAR" "a"
@@ -1219,7 +1225,7 @@ gathermerge1 = A.GATHERMERGE
                         }
                       ]
                     , A.operator =
-                        A.SEQSCAN
+                        A.PARALLEL A.SEQSCAN
                         { A.targetlist =
                           [ A.TargetEntry
                             { A.targetexpr = A.VAR "indexed" "a"
@@ -1284,7 +1290,7 @@ checkAndGenerate authStr op = do
   putStrLn $ PP.ppShow infered
   let pgplan = gprint infered
   putStrLn $ "Explain: "
-  putStrLn $ "select _pq_plan_explain('" ++ pgplan ++ "');"
+  putStrLn $ "select _pq_plan_explain('" ++ pgplan ++ "', true);"
   putStrLn $ "Execute:"
   putStrLn $ "select _pq_plan_deserialize('" ++ pgplan ++ "');"
 
@@ -1336,5 +1342,5 @@ main = do
     let cp = forceEither config
     let authStr = forceEither $ get cp "Main" "dbauth" :: String
 
-    checkAndGenerate authStr gather1
+    checkAndGenerate authStr gathermerge1
     -- checkAndGenerateStmt authStr recursive1

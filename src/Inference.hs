@@ -770,7 +770,7 @@ trOperator (I.BITMAPHEAPSCAN {I.targetlist, I.bitmapqualorig, I.operator, I.scan
               , O.scanrelid = index'
               , O.bitmapqualorig = O.List bitmapqualorig'}
 
-trOperator (I.AGG {I.targetlist, I.operator, I.groupCols})
+trOperator (I.AGG {I.targetlist, I.operator, I.groupCols, I.aggstrategy, I.aggsplit})
   = do
     context <- lift $ ask
     operator' <- trOperator operator
@@ -797,8 +797,8 @@ trOperator (I.AGG {I.targetlist, I.operator, I.groupCols})
     return $ O.AGG
               { O.genericPlan  = (O.defaultPlan { O.targetlist= O.List targetlist'
                                                 , O.lefttree = Just operator'})
-              , O.aggstrategy  = if (null groupCols) then 0 else 2
-              , O.aggsplit     = 0
+              , O.aggstrategy  = I.aggStrategyToInt aggstrategy
+              , O.aggsplit     = sum $ map I.aggSplitToInt aggsplit
               , O.numCols      = fromIntegral (length groupCols)
               , O.grpColIdx    = O.PlainList groupCols
               , O.grpOperators = O.PlainList ops
