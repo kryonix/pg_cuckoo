@@ -1252,6 +1252,160 @@ gathermerge1 = A.GATHERMERGE
                 , A.sortCols = [ A.SortEx 1 True False ]
                 }
 
+paragg :: A.Operator
+paragg = {-A.AGG
+        { A.targetlist =
+          [ A.TargetEntry
+            { A.targetexpr = 
+              A.AGGREF
+              { A.aggname = "avg"
+              , A.aggargs =
+                [ A.TargetEntry
+                  { A.targetexpr = A.VAR "OUTER_VAR" "sum"
+                  , A.targetresname = "sum"
+                  , A.resjunk = False
+                  }
+                ]
+              , A.aggdirectargs = []
+              , A.aggorder = []
+              , A.aggdistinct = []
+              , A.aggfilter = Nothing
+              , A.aggstar = False
+              }
+            , A.targetresname = "sum"
+            , A.resjunk = False
+            }
+          ]
+        , A.operator = -}
+          A.GATHER
+          { A.targetlist =
+            [ A.TargetEntry
+              { A.targetexpr = A.VAR "OUTER_VAR" "sum"
+              , A.targetresname = "sum"
+              , A.resjunk = False
+              }
+            ]
+          , A.operator =
+            A.PARALLEL A.AGG
+            { A.targetlist =
+              [ A.TargetEntry
+                { A.targetexpr =
+                  A.AGGREF
+                  { A.aggname = "sum"
+                  , A.aggargs =
+                    [ A.TargetEntry
+                      { A.targetexpr = A.VAR "OUTER_VAR" "a" 
+                      , A.targetresname = "sum"
+                      , A.resjunk = False
+                      }
+                    ]
+                  , A.aggdirectargs = []
+                  , A.aggorder = []
+                  , A.aggdistinct = []
+                  , A.aggfilter = Nothing
+                  , A.aggstar = False
+                  }
+                , A.targetresname = "sum"
+                , A.resjunk = False
+                }
+              ]
+            , A.operator =
+              A.PARALLEL A.SEQSCAN
+              { A.targetlist =
+                [ A.TargetEntry
+                  { A.targetexpr = A.VAR "indexed" "a"
+                  , A.targetresname = "a"
+                  , A.resjunk = False
+                  }
+                ]
+              , A.qual = []
+              , A.scanrelation = "indexed"
+              }
+            , A.groupCols = []
+            , A.aggstrategy = A.AGG_PLAIN
+            , A.aggsplit    = A.aggSPLIT_INITIAL_SERIAL
+            }
+          , A.num_workers = 10
+          , A.rescan_param = 0
+          }
+        -- , A.groupCols = []
+        -- , A.aggstrategy = A.AGG_PLAIN
+        -- , A.aggsplit    = A.aggSPLIT_FINAL_DESERIAL
+        -- }
+
+ctescan2 :: A.PlannedStmt
+ctescan2 = A.PlannedStmt
+            { A.planTree =
+              A.NESTLOOP
+              { A.targetlist = 
+                [ A.TargetEntry
+                  { A.targetexpr = A.VAR "OUTER_VAR" "x"
+                  , A.targetresname = "x"
+                  , A.resjunk = False
+                  }
+                , A.TargetEntry
+                  { A.targetexpr = A.VAR "INNER_VAR" "x"
+                  , A.targetresname = "x"
+                  , A.resjunk = False
+                  }
+                ]
+              , A.joinType = A.INNER
+              , A.inner_unique = False
+              , A.joinquals = []
+              , A.nestParams = []
+              , A.lefttree =
+                A.CTESCAN
+                { A.targetlist =
+                  [ A.TargetEntry
+                    { A.targetexpr = A.SCANVAR 1
+                    , A.targetresname = "x"
+                    , A.resjunk = False
+                    }
+                  ]
+                , A.qual = []
+                , A.ctename = "num"
+                , A.recursive = False
+                , A.initPlan = [1]
+                }
+            , A.righttree =
+                A.CTESCAN
+                { A.targetlist =
+                  [ A.TargetEntry
+                    { A.targetexpr = A.SCANVAR 1
+                    , A.targetresname = "x"
+                    , A.resjunk = False
+                    }
+                  ]
+                , A.qual = []
+                , A.ctename = "num"
+                , A.recursive = False
+                , A.initPlan = [2]
+                }
+              }
+            , A.subplans =
+              [ A.RESULT
+                { A.targetlist =
+                  [ A.TargetEntry
+                    { A.targetexpr = A.CONST "1" "int4"
+                    , A.targetresname = "x"
+                    , A.resjunk = False
+                    }
+                  ]
+                , A.resconstantqual = Nothing
+                }
+              , A.RESULT
+                { A.targetlist =
+                  [ A.TargetEntry
+                    { A.targetexpr = A.CONST "41" "int4"
+                    , A.targetresname = "x"
+                    , A.resjunk = False
+                    }
+                  ]
+                , A.resconstantqual = Nothing
+                }
+              ]
+            }
+
 -- access list elements safely
 (!!) :: [a] -> Int -> Maybe a
 (!!) lst idx = if idx >= length lst
@@ -1342,5 +1496,5 @@ main = do
     let cp = forceEither config
     let authStr = forceEither $ get cp "Main" "dbauth" :: String
 
-    checkAndGenerate authStr gathermerge1
-    -- checkAndGenerateStmt authStr recursive1
+    checkAndGenerate authStr paragg
+    -- checkAndGenerateStmt authStr ctescan2
