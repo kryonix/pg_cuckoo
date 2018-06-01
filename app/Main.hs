@@ -1253,7 +1253,7 @@ gathermerge1 = A.GATHERMERGE
                 }
 
 paragg :: A.Operator
-paragg = {-A.AGG
+paragg = A.AGG
         { A.targetlist =
           [ A.TargetEntry
             { A.targetexpr = 
@@ -1276,7 +1276,7 @@ paragg = {-A.AGG
             , A.resjunk = False
             }
           ]
-        , A.operator = -}
+        , A.operator =
           A.GATHER
           { A.targetlist =
             [ A.TargetEntry
@@ -1328,10 +1328,10 @@ paragg = {-A.AGG
           , A.num_workers = 10
           , A.rescan_param = 0
           }
-        -- , A.groupCols = []
-        -- , A.aggstrategy = A.AGG_PLAIN
-        -- , A.aggsplit    = A.aggSPLIT_FINAL_DESERIAL
-        -- }
+        , A.groupCols = []
+        , A.aggstrategy = A.AGG_PLAIN
+        , A.aggsplit    = A.aggSPLIT_FINAL_DESERIAL
+        }
 
 ctescan2 :: A.PlannedStmt
 ctescan2 = A.PlannedStmt
