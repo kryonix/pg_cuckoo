@@ -1258,7 +1258,7 @@ paragg = A.AGG
           [ A.TargetEntry
             { A.targetexpr = 
               A.AGGREF
-              { A.aggname = "avg"
+              { A.aggname = "sum"
               , A.aggargs =
                 [ A.TargetEntry
                   { A.targetexpr = A.VAR "OUTER_VAR" "sum"

@@ -29,7 +29,7 @@ import Debug.Trace
 
 generatePlan :: TableData -> [(I.Expr, O.Expr)] -> [String] -> [I.Operator] -> I.PlannedStmt -> O.PLANNEDSTMT
 generatePlan tableD exprs tableNames valuesScan ast = let
-    (stmt, lg) = runOperSem (trPlannedStmt ast tableNames valuesScan) (StateI 0 0 False) (C tableD exprs [] [] [])
+    (stmt, lg) = runOperSem (trPlannedStmt ast tableNames valuesScan) (StateI 0 0 False) (C tableD exprs [] [] [] False)
     res = case stmt of
             Prelude.Left str -> error $ "Inference error: " ++ str
             Prelude.Right a -> a
@@ -38,11 +38,12 @@ generatePlan tableD exprs tableNames valuesScan ast = let
 --------------------------------------------------------------------------------
 -- READER MONAD SECTION
 
-data Context = C { tableData  :: TableData          -- ^ as provided by the GetTable module
-                 , exprs      :: [(I.Expr, O.Expr)]
-                 , rtables    :: [PgTable]
-                 , valueScans :: [(I.Operator, Integer)]
-                 , subplanLst :: [O.Plan]
+data Context = C { tableData     :: TableData          -- ^ as provided by the GetTable module
+                 , exprs         :: [(I.Expr, O.Expr)]
+                 , rtables       :: [PgTable]
+                 , valueScans    :: [(I.Operator, Integer)]
+                 , subplanLst    :: [O.Plan]
+                 , isParallelAgg :: Bool
                  }
 
 getRTableData :: Rule () TableData
@@ -59,6 +60,9 @@ getValueScans () = lift $ asks valueScans
 
 getSubplanLst :: Rule () [O.Plan]
 getSubplanLst () = lift $ asks subplanLst
+
+getIsParallelAgg :: Rule () Bool
+getIsParallelAgg () = lift $ asks isParallelAgg
 
 getRTableRow :: Rule (TableData -> Tbl.Table, Table -> [Row]) [Row]
 getRTableRow (tbl, idx) = do
@@ -335,8 +339,10 @@ trOperator n@(I.RESULT { I.targetlist=targetlist, I.resconstantqual})
   = do
     targetlist' <- mapM trTargetEntry $ zip targetlist [1..]
     qual'       <- mapM trExpr resconstantqual
-
-    when (isJust qual' && getExprType (fromJust qual') /= 16)
+    typ <- if isJust (qual')
+           then getExprType (fromJust qual')
+           else return 0
+    when (isJust qual' && typ == 16)
       $ error $ "Type error: resconstantqual is not a boolean"
               ++ "\n" ++ PP.ppShow n
 
@@ -350,7 +356,7 @@ trOperator n@(I.PROJECTSET { I.targetlist, I.operator })
     -- Generate a fake table with fake columns.
     -- We need this to perform inference of VAR, referencing
     -- sub-operators.
-    let fakeTable = createFakeTable "OUTER_VAR" (O.targetlist $ O.genericPlan operator')
+    fakeTable <- createFakeTable "OUTER_VAR" (O.targetlist $ O.genericPlan operator')
     -- Get rid of existing fake-tables (maybe not required?)
     let rtablesC = dropWhile (\(PgTable {tOID}) -> tOID == -1) $ rtables context
     let context' = context {rtables=fakeTable:rtablesC}
@@ -368,7 +374,9 @@ trOperator n@(I.SEQSCAN { I.targetlist, I.qual, I.scanrelation })
     targetlist' <- mapM trTargetEntry $ zip targetlist [1..]
     qual'       <- mapM trExpr qual
 
-    when (any (\x -> getExprType x /= 16) qual')
+    types <- mapM getExprType qual'
+
+    when (any (\x -> x /= 16) types)
       $ error $ "Type error: qual is not a boolean"
               ++ "\n" ++ PP.ppShow n
 
@@ -385,11 +393,19 @@ trOperator n@(I.LIMIT { I.operator, I.limitOffset, I.limitCount })
     limitOffset' <- mapM trExpr limitOffset
     limitCount'  <- mapM trExpr limitCount
 
-    when (isJust limitOffset' && getExprType (fromJust limitOffset') /= 20)
+    oType <- if isJust limitOffset'
+             then getExprType (fromJust limitOffset')
+             else return 0
+
+    lType <- if isJust limitOffset'
+             then getExprType (fromJust limitOffset')
+             else return 0
+
+    when (isJust limitOffset' && oType /= 20)
       $ error $ "Type error: limitOffset is not an int8"
               ++ "\n" ++ PP.ppShow n
 
-    when (isJust limitCount' && getExprType (fromJust limitCount') /= 20)
+    when (isJust limitCount' && lType /= 20)
       $ error $ "Type error: limitCount is not an int8"
               ++ "\n" ++ PP.ppShow n
 
@@ -405,7 +421,7 @@ trOperator n@(I.SORT { I.targetlist, I.operator, I.sortCols })
     -- Generate a fake table with fake columns.
     -- We need this to perform inference of VAR, referencing
     -- sub-operators.
-    let fakeTable = createFakeTable "OUTER_VAR" (O.targetlist $ O.genericPlan operator')
+    fakeTable <- createFakeTable "OUTER_VAR" (O.targetlist $ O.genericPlan operator')
     -- Get rid of existing fake-tables (maybe not required?)
     let rtablesC = dropWhile (\(PgTable {tOID}) -> tOID == -1) $ rtables context
     let context' = context {rtables=fakeTable:rtablesC}
@@ -447,14 +463,14 @@ trOperator (I.GROUP { I.targetlist, I.qual, I.operator, I.groupCols})
     -- Generate a fake table with fake columns.
     -- We need this to perform inference of VAR, referencing
     -- sub-operators.
-    let fakeTable = createFakeTable "OUTER_VAR" (O.targetlist $ O.genericPlan operator')
+    fakeTable <- createFakeTable "OUTER_VAR" (O.targetlist $ O.genericPlan operator')
     -- Get rid of existing fake-tables (maybe not required?)
     let rtablesC = dropWhile (\(PgTable {tOID}) -> tOID == -1) $ rtables context
     let context' = context {rtables=fakeTable:rtablesC}
 
     targetlist' <- local (const context') $ mapM trTargetEntry $ zip targetlist [1..]
 
-    let grpTargets = map (getExprType . O.expr)
+    grpTargets <- mapM (getExprType . O.expr)
                           $ filter (\(O.TARGETENTRY {O.ressortgroupref=x}) -> x `elem` groupCols) targetlist'
 
     -- Try to find function in pg_operator by name and argument types
@@ -481,7 +497,7 @@ trOperator (I.APPEND {I.targetlist, I.appendplans})
     -- Generate a fake table with fake columns.
     -- We need this to perform inference of VAR, referencing
     -- sub-operators.
-    let fakeTable = createFakeTable "OUTER_VAR" (O.targetlist $ O.genericPlan (head appendplans'))
+    fakeTable <- createFakeTable "OUTER_VAR" (O.targetlist $ O.genericPlan (head appendplans'))
     -- Get rid of existing fake-tables (maybe not required?)
     let rtablesC = dropWhile (\(PgTable {tOID}) -> tOID == -1) $ rtables context
     let context' = context {rtables=fakeTable:rtablesC}
@@ -503,7 +519,7 @@ trOperator (I.MERGEAPPEND { I.targetlist, I.mergeplans, I.sortCols })
     -- Generate a fake table with fake columns.
     -- We need this to perform inference of VAR, referencing
     -- sub-operators.
-    let fakeTable = createFakeTable "OUTER_VAR" (O.targetlist $ O.genericPlan (head mergeplans'))
+    fakeTable <- createFakeTable "OUTER_VAR" (O.targetlist $ O.genericPlan (head mergeplans'))
     -- Get rid of existing fake-tables (maybe not required?)
     let rtablesC = dropWhile (\(PgTable {tOID}) -> tOID == -1) $ rtables context
     let context' = context {rtables=fakeTable:rtablesC}
@@ -540,21 +556,21 @@ trOperator (I.RECURSIVEUNION {I.targetlist, I.lefttree, I.righttree, I.wtParam, 
   = do
     context <- lift $ ask
     lefttree' <- trOperator lefttree
-    let fakeInner = createFakeTable ctename (O.targetlist $ O.genericPlan lefttree')
+    fakeInner <- createFakeTable ctename (O.targetlist $ O.genericPlan lefttree')
 
     let rtablesC = rtables context
     let context'' = context {rtables=fakeInner:rtablesC}
 
     righttree' <- local (const context'') $ trOperator righttree
 
-    let fakeOuter = createFakeTable "OUTER_VAR" (O.targetlist $ O.genericPlan righttree')
+    fakeOuter <- createFakeTable "OUTER_VAR" (O.targetlist $ O.genericPlan righttree')
     let fakeTables = [fakeOuter]
 
     let context' = context {rtables=fakeTables++rtablesC}
 
     targetlist' <- local (const context') $ mapM trTargetEntry $ zip targetlist [1..]
 
-    let grpTargets = map (getExprType . O.expr) targetlist'
+    grpTargets <- mapM (getExprType . O.expr) targetlist'
 
     -- Try to find function in pg_operator by name and argument types
     ops <- mapM ((liftM fst) . searchOperator) $ zip grpTargets (repeat "=")
@@ -746,7 +762,7 @@ trOperator (I.BITMAPHEAPSCAN {I.targetlist, I.bitmapqualorig, I.operator, I.scan
     -- Generate a fake table with fake columns.
     -- We need this to perform inference of VAR, referencing
     -- sub-operators.
-    let fakeTable = createFakeTable "OUTER_VAR" (O.targetlist $ O.genericPlan operator')
+    fakeTable <- createFakeTable "OUTER_VAR" (O.targetlist $ O.genericPlan operator')
     -- Get rid of existing fake-tables (maybe not required?)
     let rtablesC = dropWhile (\(PgTable {tOID}) -> tOID == -1) $ rtables context
     let context' = context {rtables=fakeTable:rtablesC}
@@ -773,22 +789,26 @@ trOperator (I.BITMAPHEAPSCAN {I.targetlist, I.bitmapqualorig, I.operator, I.scan
 trOperator (I.AGG {I.targetlist, I.operator, I.groupCols, I.aggstrategy, I.aggsplit})
   = do
     context <- lift $ ask
-    operator' <- trOperator operator
 
+    isParallelAgg' <- getIsParallelAgg ()
+    let isParallelAgg = isParallelAgg' || aggsplit == I.aggSPLIT_FINAL_DESERIAL || aggsplit == I.aggSPLIT_INITIAL_SERIAL
+    let context'' = context {isParallelAgg=isParallelAgg}
+
+    operator' <- local (const context'') $ trOperator operator
 
     -- OUTER_PLAN = first of appendplans
     -- Generate a fake table with fake columns.
     -- We need this to perform inference of VAR, referencing
     -- sub-operators.
-    let fakeTable = createFakeTable "OUTER_VAR" (O.targetlist $ O.genericPlan operator')
+    fakeTable <- createFakeTable "OUTER_VAR" (O.targetlist $ O.genericPlan operator')
     -- Get rid of existing fake-tables (maybe not required?)
     let rtablesC = dropWhile (\(PgTable {tOID}) -> tOID == -1) $ rtables context
-    let context' = context {rtables=fakeTable:rtablesC}
+    let context' = context {rtables=fakeTable:rtablesC, isParallelAgg=isParallelAgg}
 
     targetlist' <- local (const context') $ mapM trTargetEntry $ zip targetlist [1..]
 
 
-    let grpTargets = map (getExprType . O.expr)
+    grpTargets <- mapM (getExprType . O.expr)
                           $ filter (\(O.TARGETENTRY {O.ressortgroupref=x}) -> x `elem` groupCols) targetlist'
 
     -- Try to find function in pg_operator by name and argument types
@@ -817,7 +837,7 @@ trOperator (I.WINDOWAGG {I.targetlist, I.operator, I.winrefId, I.ordEx, I.groupC
     -- Generate a fake table with fake columns.
     -- We need this to perform inference of VAR, referencing
     -- sub-operators.
-    let fakeTable = createFakeTable "OUTER_VAR" (O.targetlist $ O.genericPlan operator')
+    fakeTable <- createFakeTable "OUTER_VAR" (O.targetlist $ O.genericPlan operator')
     -- Get rid of existing fake-tables (maybe not required?)
     let rtablesC = dropWhile (\(PgTable {tOID}) -> tOID == -1) $ rtables context
     let context' = context {rtables=fakeTable:rtablesC}
@@ -827,7 +847,7 @@ trOperator (I.WINDOWAGG {I.targetlist, I.operator, I.winrefId, I.ordEx, I.groupC
     startOffset' <- local (const context') $ mapM trExpr startOffset
     endOffset'   <- local (const context') $ mapM trExpr endOffset
 
-    let grpTargets = map (getExprType . O.expr)
+    grpTargets <- mapM (getExprType . O.expr)
                           $ filter (\(O.TARGETENTRY {O.ressortgroupref=x}) -> x `elem` groupCols) targetlist'
 
     -- Try to find function in pg_operator by name and argument types
@@ -864,27 +884,29 @@ trOperator (I.MATERIAL {I.operator})
 
     let genPlan = zip [1..] $ ( (\(O.List x) -> x) . O.targetlist . O.genericPlan) operator'
     -- Take targetlist of sub-plan to generate references to the columns.
-    let targetlist' = map (\(n, O.TARGETENTRY{O.expr=e, O.resname=resname}) ->
-                              O.TARGETENTRY
-                                { O.expr=
-                                    O.VAR
-                                      { O.varno       = 65001
-                                      , O.varattno    = n
-                                      , O.vartype     = getExprType e
-                                      , O.vartypmod   = -1
-                                      , O.varcollid   = 0
-                                      , O.varlevelsup = 0
-                                      , O.varnoold    = n
-                                      , O.varoattno   = n
-                                      , O.location    = -1
-                                      }
-                                , O.resno = n
-                                , O.resname = resname
-                                , O.ressortgroupref = 0
-                                , O.resorigtbl = 0
-                                , O.resorigcol = 0
-                                , O.resjunk = O.PgBool False
-                                } ) genPlan
+    targetlist' <- mapM (\(n, O.TARGETENTRY{O.expr=e, O.resname=resname}) ->
+                              do
+                                typ <- getExprType e
+                                return $ O.TARGETENTRY
+                                        { O.expr=
+                                            O.VAR
+                                              { O.varno       = 65001
+                                              , O.varattno    = n
+                                              , O.vartype     = typ
+                                              , O.vartypmod   = -1
+                                              , O.varcollid   = 0
+                                              , O.varlevelsup = 0
+                                              , O.varnoold    = n
+                                              , O.varoattno   = n
+                                              , O.location    = -1
+                                              }
+                                        , O.resno = n
+                                        , O.resname = resname
+                                        , O.ressortgroupref = 0
+                                        , O.resorigtbl = 0
+                                        , O.resorigcol = 0
+                                        , O.resjunk = O.PgBool False
+                                        } ) genPlan
 
     return $ O.MATERIAL
               { O.genericPlan =
@@ -900,8 +922,8 @@ trOperator (I.NESTLOOP {I.targetlist, I.joinType, I.inner_unique, I.joinquals, I
 
     context <- lift $ ask
 
-    let fakeOuter = createFakeTable "OUTER_VAR" (O.targetlist $ O.genericPlan lefttree')
-    let fakeInner = createFakeTable "INNER_VAR" (O.targetlist $ O.genericPlan righttree')
+    fakeOuter <- createFakeTable "OUTER_VAR" (O.targetlist $ O.genericPlan lefttree')
+    fakeInner <- createFakeTable "INNER_VAR" (O.targetlist $ O.genericPlan righttree')
     let fakeTables = [fakeOuter, fakeInner]
 
     -- Get rid of existing fake-tables (maybe not required?)
@@ -938,8 +960,8 @@ trOperator (I.MERGEJOIN {I.targetlist, I.qual, I.joinType, I.inner_unique, I.joi
 
     context <- lift $ ask
 
-    let fakeOuter = createFakeTable "OUTER_VAR" (O.targetlist $ O.genericPlan lefttree')
-    let fakeInner = createFakeTable "INNER_VAR" (O.targetlist $ O.genericPlan righttree')
+    fakeOuter <- createFakeTable "OUTER_VAR" (O.targetlist $ O.genericPlan lefttree')
+    fakeInner <- createFakeTable "INNER_VAR" (O.targetlist $ O.genericPlan righttree')
     let fakeTables = [fakeOuter, fakeInner]
 
     -- Get rid of existing fake-tables (maybe not required?)
@@ -986,7 +1008,7 @@ trOperator (I.UNIQUE {I.operator, I.uniqueCols})
     operator' <- trOperator operator
     let targetlist = ((\(O.List x) -> x) . O.targetlist . O.genericPlan) operator'
 
-    let grpTargets = map (getExprType . O.expr)
+    grpTargets <- mapM (getExprType . O.expr)
                       $ filter (\(O.TARGETENTRY {O.ressortgroupref=x}) -> x `elem` uniqueCols) targetlist
 
     -- Try to find function in pg_operator by name and argument types
@@ -1015,10 +1037,11 @@ trOperator s@(I.SUBQUERYSCAN {I.targetlist, I.qual, I.subplan})
                       , I.targetresname
                       , I.resjunk
                       }) -> do
+                            typ <- getExprType $ O.expr $ (((\(O.List x) -> x) . O.targetlist . O.genericPlan) subplan') !! (fromIntegral colPos-1)
                             let expr' = O.VAR
                                         { O.varno = n
                                         , O.varattno = colPos
-                                        , O.vartype  = getExprType $ O.expr $ (((\(O.List x) -> x) . O.targetlist . O.genericPlan) subplan') !! (fromIntegral colPos-1)
+                                        , O.vartype  = typ
                                         , O.vartypmod = -1
                                         , O.varcollid = 0
                                         , O.varlevelsup = 0
@@ -1079,10 +1102,11 @@ trOperator t@(I.FUNCTIONSCAN {I.targetlist, I.qual, I.functions, I.funcordinalit
                       , I.targetresname
                       , I.resjunk
                       }) -> do
+                            typ <- getExprType $ functions' !! (fromIntegral colPos-1)
                             let expr' = O.VAR
                                         { O.varno = n
                                         , O.varattno = colPos
-                                        , O.vartype  = getExprType $ functions' !! (fromIntegral colPos-1)
+                                        , O.vartype  = typ
                                         , O.vartypmod = -1
                                         , O.varcollid = 0
                                         , O.varlevelsup = 0
@@ -1127,10 +1151,11 @@ trOperator s@(I.VALUESSCAN {I.targetlist, I.qual, I.values_list})
                           , I.targetresname
                           , I.resjunk
                           }) -> do
+                                typ <- getExprType $ (head values_list') !! (fromIntegral colPos-1)
                                 let expr' = O.VAR
                                             { O.varno = n
                                             , O.varattno = colPos
-                                            , O.vartype  = getExprType $ (head values_list') !! (fromIntegral colPos-1)
+                                            , O.vartype  = typ
                                             , O.vartypmod = -1
                                             , O.varcollid = 0
                                             , O.varlevelsup = 0
@@ -1178,10 +1203,11 @@ trOperator s@(I.CTESCAN {I.targetlist, I.qual, I.ctename, I.recursive, I.initPla
                           , I.targetresname
                           , I.resjunk
                           }) -> do
+                                typ <- getExprType $ O.expr $ (((\(O.List x) -> x) . O.targetlist . O.genericPlan) (head subplans)) !! (fromIntegral colPos-1)
                                 let expr' = O.VAR
                                             { O.varno = n
                                             , O.varattno = colPos
-                                            , O.vartype  = getExprType $ O.expr $ (((\(O.List x) -> x) . O.targetlist . O.genericPlan) (head subplans)) !! (fromIntegral colPos-1)
+                                            , O.vartype  = typ
                                             , O.vartypmod = -1
                                             , O.varcollid = 0
                                             , O.varlevelsup = 0
@@ -1229,7 +1255,7 @@ trOperator (I.GATHER {I.targetlist, I.operator, I.num_workers, I.rescan_param})
     -- Generate a fake table with fake columns.
     -- We need this to perform inference of VAR, referencing
     -- sub-operators.
-    let fakeTable = createFakeTable "OUTER_VAR" (O.targetlist $ O.genericPlan operator')
+    fakeTable <- createFakeTable "OUTER_VAR" (O.targetlist $ O.genericPlan operator')
     -- Get rid of existing fake-tables (maybe not required?)
     let rtablesC = dropWhile (\(PgTable {tOID}) -> tOID == -1) $ rtables context
     let context' = context {rtables=fakeTable:rtablesC}
@@ -1261,7 +1287,7 @@ trOperator (I.GATHERMERGE {I.targetlist, I.operator, I.num_workers, I.rescan_par
     -- Generate a fake table with fake columns.
     -- We need this to perform inference of VAR, referencing
     -- sub-operators.
-    let fakeTable = createFakeTable "OUTER_VAR" (O.targetlist $ O.genericPlan operator')
+    fakeTable <- createFakeTable "OUTER_VAR" (O.targetlist $ O.genericPlan operator')
     -- Get rid of existing fake-tables (maybe not required?)
     let rtablesC = dropWhile (\(PgTable {tOID}) -> tOID == -1) $ rtables context
     let context' = context {rtables=fakeTable:rtablesC}
@@ -1311,7 +1337,7 @@ trOperator s@(I.HASH {I.targetlist, I.qual, I.operator, I.skewTable, I.skewColum
     -- Generate a fake table with fake columns.
     -- We need this to perform inference of VAR, referencing
     -- sub-operators.
-    let fakeTable = createFakeTable "OUTER_VAR" (O.targetlist $ O.genericPlan operator')
+    fakeTable <- createFakeTable "OUTER_VAR" (O.targetlist $ O.genericPlan operator')
     -- Get rid of existing fake-tables (maybe not required?)
     let rtablesC = dropWhile (\(PgTable {tOID}) -> tOID == -1) $ rtables context
     let context' = context {rtables=fakeTable:rtablesC}
@@ -1340,8 +1366,8 @@ trOperator s@(I.HASHJOIN {I.targetlist, I.joinType, I.inner_unique, I.joinquals,
 
     context <- lift $ ask
 
-    let fakeOuter = createFakeTable "OUTER_VAR" (O.targetlist $ O.genericPlan lefttree')
-    let fakeInner = createFakeTable "INNER_VAR" (O.targetlist $ O.genericPlan righttree')
+    fakeOuter <- createFakeTable "OUTER_VAR" (O.targetlist $ O.genericPlan lefttree')
+    fakeInner <- createFakeTable "INNER_VAR" (O.targetlist $ O.genericPlan righttree')
     let fakeTables = [fakeOuter, fakeInner]
 
     -- Get rid of existing fake-tables (maybe not required?)
@@ -1378,7 +1404,7 @@ trOperator (I.SETOP {I.targetlist, I.qual, I.setopStrategy, I.setOpCmd, I.lefttr
 
     context <- lift $ ask
 
-    let fakeOuter = createFakeTable "OUTER_VAR" (O.targetlist $ O.genericPlan lefttree')
+    fakeOuter <- createFakeTable "OUTER_VAR" (O.targetlist $ O.genericPlan lefttree')
     let fakeTables = [fakeOuter]
 
     -- Get rid of existing fake-tables (maybe not required?)
@@ -1388,7 +1414,7 @@ trOperator (I.SETOP {I.targetlist, I.qual, I.setopStrategy, I.setOpCmd, I.lefttr
     targetlist' <- local (const context') $ mapM trTargetEntry $ zip targetlist [1..]
     qual'       <- local (const context') $ mapM trExpr qual
 
-    let targets = init $ map (getExprType . O.expr) $ ((\(O.List x) -> x) . O.targetlist . O.genericPlan) lefttree'
+    targets <- liftM init $ mapM (getExprType . O.expr) $ ((\(O.List x) -> x) . O.targetlist . O.genericPlan) lefttree'
 
     -- Try to find function in pg_operator by name and argument types
     dupOperators <- mapM ((liftM fst) . searchOperator) $ zip targets (repeat "=")
@@ -1435,27 +1461,29 @@ trOperator (I.PARALLEL {I.operator})
 
 -- | Takes a list of targetentries and a name to generate a fake table
 -- This table is used for VAR "{INNER,OUTER}_VAR" references.
-createFakeTable :: String -> (O.List O.TARGETENTRY) -> PgTable
+createFakeTable :: Rule2 String (O.List O.TARGETENTRY) PgTable
 createFakeTable name (O.List targets)
-  = PgTable { tOID = -1, tName = name, tKind = "", tCols = fakeCols }
-    where
-      fakeCols = [ PgColumn
-                    { cAttname      = maybe "" id resname
-                    , cAtttypid     = getExprType expr
-                    , cAttlen       = 0
-                    , cAttnum       = num
-                    , cAtttypmod    = -1
-                    , cAttcollation = 0
-                    }
-                 |
-                  (O.TARGETENTRY { O.expr=expr, O.resname }, num) <- zip targets [1..]
-                 ]
+  = do
+    fakeCols <- forM (zip targets [1..]) $
+                      \x -> do
+                        let (O.TARGETENTRY { O.expr=expr, O.resname }, num) = x
+                        typ <- getExprType expr
+                        return $ PgColumn
+                                  { cAttname      = maybe "" id resname
+                                  , cAtttypid     = typ
+                                  , cAttlen       = 0
+                                  , cAttnum       = num
+                                  , cAtttypmod    = -1
+                                  , cAttcollation = 0
+                                  }
+
+    return $ PgTable { tOID = -1, tName = name, tKind = "", tCols = fakeCols }
 
 trSortEx :: Rule2 [O.TARGETENTRY] I.SortEx O.SORTGROUPCLAUSE
 trSortEx targetlist (I.SortEx { I.sortTarget, I.sortASC, I.sortNullsFirst })
   = do
     let targetExpr:_ = filter ((==sortTarget) . O.ressortgroupref) targetlist
-    let targetType = getExprType $ O.expr targetExpr
+    targetType <- getExprType $ O.expr targetExpr
     let targetSortop = if sortASC then "<" else ">"
 
     opno <- liftM fst $ searchOperator (targetType, targetSortop)
@@ -1516,14 +1544,14 @@ trSubPlan name (n, x) = do
 
     -- Have to do bookkeeping about the number of params 'generated'
     incrParam 1
-
+    firstColType <- getExprType $ O.expr $ head $ (\(O.List x) -> x) targetlist
     return $ O.SUBPLAN
               { O.subLinkType       = 7        -- CTE_SUBLINK
               , O.testexpr          = Nothing
               , O.paramIds          = O.List [n]
               , O.plan_id           = plan_node_id
               , O.plan_name         = name
-              , O.firstColType      = getExprType $ O.expr $ head $ (\(O.List x) -> x) targetlist
+              , O.firstColType      = firstColType
               , O.firstColTypmod    = -1
               , O.firstColCollation = 0
               , O.useHashTable      = O.PgBool False
@@ -1587,7 +1615,7 @@ trExpr n@(I.FUNCEXPR { I.funcname, I.funcargs })
     funcargs' <- mapM trExpr funcargs
 
     -- Type check
-    let argTypes = map getExprType funcargs'
+    argTypes <- mapM getExprType funcargs'
 
     -- Get tables from context, we have to do it that way instead of via
     -- findRow, because we need to perform a search using multiple qualifications.
@@ -1655,7 +1683,7 @@ trExpr n@(I.FUNCEXPR { I.funcname, I.funcargs })
 trExpr n@(I.OPEXPR { I.oprname, I.oprargs })
   = do
     args' <- mapM trExpr oprargs
-    let argTypes = map getExprType args'
+    argTypes <- mapM getExprType args'
     let (oprleft, oprright) = case argTypes of
                               [r]    -> (0, r)
                               [l, r] -> (l, r)
@@ -1702,9 +1730,10 @@ trExpr n@(I.OPEXPR { I.oprname, I.oprargs })
 
 trExpr n@(I.AGGREF {I.aggname, I.aggargs, I.aggdirectargs, I.aggorder, I.aggdistinct, I.aggfilter, I.aggstar})
   = do
+    parAgg <- getIsParallelAgg ()
     -- Compile args first, because we need the types to select the row in pg_proc
     args' <- mapM trTargetEntry $ zip aggargs [1..]
-    let argTypes = map (getExprType . O.expr) args'
+    argTypes <- mapM (getExprType . O.expr) args'
 
     let proallargtypesDB x = DB.safeFromSql $ x M.! "proallargtypes" :: ConvertResult String
     let proallargtypes p = case proallargtypesDB p of
@@ -1785,7 +1814,7 @@ trExpr n@(I.WINDOWFUNC {I.winname, I.winargs, I.aggfilter, I.winref, I.winstar})
   = do
     -- Compile args first, because we need the types to select the row in pg_proc
     args' <- mapM trExpr winargs
-    let argTypes = map getExprType args'
+    argTypes <- mapM getExprType args'
 
     let proallargtypesDB x = DB.safeFromSql $ x M.! "proallargtypes" :: ConvertResult String
     let proallargtypes p = case proallargtypesDB p of
@@ -1881,12 +1910,18 @@ trExpr err = error $ "trExpr not implemented: \n" ++ PP.ppShow err
 --------------------------------------------------------------------------------
 --
 
-getExprType :: O.Expr -> Integer
-getExprType (O.VAR { O.vartype }) = vartype
-getExprType (O.CONST { O.consttype }) = consttype
-getExprType (O.FUNCEXPR { O.funcresulttype }) = funcresulttype
-getExprType (O.OPEXPR { O.opresulttype }) = opresulttype
-getExprType (O.AGGREF { O.aggtype }) = aggtype
+getExprType :: Rule O.Expr Integer
+getExprType (O.VAR { O.vartype }) = return vartype
+getExprType (O.CONST { O.consttype }) = return consttype
+getExprType (O.FUNCEXPR { O.funcresulttype }) = return funcresulttype
+getExprType (O.OPEXPR { O.opresulttype }) = return opresulttype
+getExprType (O.AGGREF { O.aggtype, O.aggargtypes }) = do
+  isParAgg <- getIsParallelAgg ()
+  let (O.RelationList rl) = aggargtypes
+
+  if isParAgg
+    then return $ head rl
+    else return aggtype
 
 getExprType x = error $ "getExprType not implemented for: " ++ PP.ppShow x
 
