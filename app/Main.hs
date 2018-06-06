@@ -1406,6 +1406,418 @@ ctescan2 = A.PlannedStmt
               ]
             }
 
+--------------------------------------------------------------------------------
+-- NEUMANN UNNESTING Q1
+
+neumannQ1 :: A.PlannedStmt
+neumannQ1 = A.PlannedStmt
+            { A.planTree =
+              A.HASHJOIN
+              { A.targetlist =
+                [ A.TargetEntry
+                  { A.targetexpr = A.VAR "OUTER_VAR" "name"
+                  , A.targetresname = "name"
+                  , A.resjunk = False
+                  }
+                , A.TargetEntry
+                  { A.targetexpr = A.VAR "INNER_VAR" "course"
+                  , A.targetresname = "course"
+                  , A.resjunk = False
+                  }
+                ]
+              , A.joinType = A.INNER
+              , A.inner_unique = False
+              , A.joinquals = []
+              , A.hashclauses =
+                [ A.OPEXPR
+                  { A.oprname = "="
+                  , A.oprargs =
+                    [ A.VAR "OUTER_VAR" "id"
+                    , A.VAR "INNER_VAR" "sid"
+                    ]
+                  }
+                , A.OPEXPR
+                  { A.oprname = "="
+                  , A.oprargs =
+                    [ A.SUBPLAN                           -- FIXME
+                      { A.sublinkType = A.EXPR_SUBLINK
+                      , A.testExpr = Nothing
+                      , A.paramIds = []
+                      , A.plan_id = 1
+                      , A.plan_name = "Subplan1"
+                      , A.firstColType = "int4"
+                      , A.setParam = []
+                      , A.parParam=[0]
+                      , A.args =
+                        [ A.VAR "OUTER_VAR" "id" ]
+                      }
+                    , A.VAR "INNER_VAR" "grade"
+                    ]
+                  }
+                ]
+              , A.lefttree =
+                A.SEQSCAN
+                { A.targetlist =
+                  [ A.TargetEntry
+                    { A.targetexpr = A.VAR "students" "id"
+                    , A.targetresname = "id"
+                    , A.resjunk = False
+                    }
+                  , A.TargetEntry
+                    { A.targetexpr = A.VAR "students" "name"
+                    , A.targetresname = "name"
+                    , A.resjunk = False
+                    }
+                  , A.TargetEntry
+                    { A.targetexpr = A.VAR "students" "major"
+                    , A.targetresname = "major"
+                    , A.resjunk = False
+                    }
+                  , A.TargetEntry
+                    { A.targetexpr = A.VAR "students" "year"
+                    , A.targetresname = "year"
+                    , A.resjunk = False
+                    }
+                  ]
+                , A.qual = []
+                , A.scanrelation = "students"
+                }
+              , A.righttree =
+                A.HASH
+                { A.targetlist =
+                  [ A.TargetEntry
+                    { A.targetexpr = A.VAR "OUTER_VAR" "sid"
+                    , A.targetresname = "sid"
+                    , A.resjunk = False
+                    }
+                  , A.TargetEntry
+                    { A.targetexpr = A.VAR "OUTER_VAR" "course"
+                    , A.targetresname = "course"
+                    , A.resjunk = False
+                    }
+                  , A.TargetEntry
+                    { A.targetexpr = A.VAR "OUTER_VAR" "grade"
+                    , A.targetresname = "grade"
+                    , A.resjunk = False
+                    }
+                  ]
+                , A.qual = []
+                , A.operator =
+                  A.SEQSCAN
+                  { A.targetlist =
+                    [ A.TargetEntry
+                      { A.targetexpr = A.VAR "exams" "sid"
+                      , A.targetresname = "sid"
+                      , A.resjunk = False
+                      }
+                    , A.TargetEntry
+                      { A.targetexpr = A.VAR "exams" "course"
+                      , A.targetresname = "course"
+                      , A.resjunk = False
+                      }
+                    , A.TargetEntry
+                      { A.targetexpr = A.VAR "exams" "grade"
+                      , A.targetresname = "grade"
+                      , A.resjunk = False
+                      }
+                    ]
+                  , A.qual = []
+                  , A.scanrelation = "exams"
+                  }
+                , A.skewTable = "exams"
+                , A.skewColumn = 0
+                }
+              }
+            , A.subplans =
+              [ A.AGG
+                { A.targetlist =
+                  [ A.TargetEntry
+                    { A.targetexpr =
+                      A.AGGREF
+                      { A.aggname = "min"
+                      , A.aggargs =
+                        [ A.TargetEntry
+                          { A.targetexpr = A.VAR "OUTER_VAR" "grade"
+                          , A.targetresname = "grade"
+                          , A.resjunk = False
+                          }
+                        ]
+                      , A.aggdirectargs = []
+                      , A.aggorder = []
+                      , A.aggdistinct = []
+                      , A.aggfilter = Nothing
+                      , A.aggstar = False
+                      }
+                    , A.targetresname = "min"
+                    , A.resjunk = False
+                    }
+                  ]
+                , A.operator =
+                  A.SEQSCAN
+                  { A.targetlist =
+                    [ A.TargetEntry
+                      { A.targetexpr = A.VAR "exams" "grade"
+                      , A.targetresname = "grade"
+                      , A.resjunk = False
+                      }
+                    ]
+                  , A.qual =
+                    [ A.OPEXPR
+                      { A.oprname = "="
+                      , A.oprargs =
+                        [ A.PARAM -- FIXME
+                          { A.paramkind = A.PARAM_EXEC
+                          , A.paramid   = 0
+                          , A.paramtype = "int4"
+                          }
+                        , A.VAR "exams" "sid"
+                        ]
+                      }
+                    ]
+                  , A.scanrelation = "exams"
+                  }
+                , A.groupCols = []
+                , A.aggstrategy = A.AGG_PLAIN
+                , A.aggsplit    = [A.AGGSPLITOP_SIMPLE]
+                }
+              ]
+            }
+
+neumannQ1' :: A.PlannedStmt
+neumannQ1' = A.PlannedStmt
+              { A.planTree =
+                A.HASHJOIN
+                { A.targetlist =
+                  [ A.TargetEntry
+                    { A.targetexpr = A.VARPOS "OUTER_VAR" 2
+                    , A.targetresname = "name"
+                    , A.resjunk = False
+                    }
+                  , A.TargetEntry
+                    { A.targetexpr = A.VARPOS "INNER_VAR" 1
+                    , A.targetresname= "course"
+                    , A.resjunk = False
+                    }
+                  ]
+                , A.joinType = A.INNER
+                , A.inner_unique = False
+                , A.joinquals = []
+                , A.hashclauses =
+                  [ A.OPEXPR
+                    { A.oprname = "="
+                    , A.oprargs =
+                      [ A.VARPOS "OUTER_VAR" 1
+                      , A.VARPOS "INNER_VAR" 2
+                      ]
+                    }
+                  ]
+                , A.lefttree =
+                  A.SEQSCAN
+                  { A.targetlist =
+                    [ A.TargetEntry
+                      { A.targetexpr = A.VARPOS "students" 1
+                      , A.targetresname = "id"
+                      , A.resjunk = False
+                      }
+                    , A.TargetEntry
+                      { A.targetexpr = A.VARPOS "students" 2
+                      , A.targetresname = "name"
+                      , A.resjunk = False
+                      }
+                    , A.TargetEntry
+                      { A.targetexpr = A.VARPOS "students" 3
+                      , A.targetresname = "major"
+                      , A.resjunk = False
+                      }
+                    , A.TargetEntry
+                      { A.targetexpr = A.VARPOS "students" 4
+                      , A.targetresname = "year"
+                      , A.resjunk = False
+                      }
+                    ]
+                  , A.qual = []
+                  , A.scanrelation = "students"
+                  }
+                , A.righttree =
+                  A.HASH
+                  { A.targetlist =
+                    [ A.TargetEntry
+                      { A.targetexpr = A.VARPOS "OUTER_VAR" 1
+                      , A.targetresname = "sid"
+                      , A.resjunk = False
+                      }
+                    , A.TargetEntry
+                      { A.targetexpr = A.VARPOS "OUTER_VAR" 2
+                      , A.targetresname = "min"
+                      , A.resjunk = False
+                      }
+                    , A.TargetEntry
+                      { A.targetexpr = A.VARPOS "OUTER_VAR" 3
+                      , A.targetresname = "course"
+                      , A.resjunk = False
+                      }
+                    ]
+                  , A.qual = []
+                  , A.operator =
+                    A.HASHJOIN
+                    { A.targetlist =
+                      [ A.TargetEntry
+                        { A.targetexpr = A.VARPOS "INNER_VAR" 1
+                        , A.targetresname = "course"
+                        , A.resjunk = False
+                        }
+                      , A.TargetEntry
+                        { A.targetexpr = A.VARPOS "INNER_VAR" 2
+                        , A.targetresname = "sid"
+                        , A.resjunk = False
+                        }
+                      , A.TargetEntry
+                        { A.targetexpr = A.VARPOS "OUTER_VAR" 1
+                        , A.targetresname = "min"
+                        , A.resjunk = False
+                        }
+                      ]
+                    , A.joinType = A.INNER
+                    , A.inner_unique = False
+                    , A.joinquals =
+                      []
+                    , A.hashclauses =
+                      [ A.OPEXPR
+                        { A.oprname = "="
+                        , A.oprargs =
+                          [ A.VARPOS "OUTER_VAR" 1
+                          , A.VARPOS "INNER_VAR" 2
+                          ]
+                        }
+                      , A.OPEXPR
+                        { A.oprname = "="
+                        , A.oprargs =
+                          [ A.VARPOS "OUTER_VAR" 2
+                          , A.VARPOS "INNER_VAR" 3
+                          ]
+                        }
+                      ]
+                    , A.lefttree =
+                      A.AGG
+                      { A.targetlist =
+                        [ A.TargetEntry
+                          { A.targetexpr = A.VARPOS "OUTER_VAR" 1
+                          , A.targetresname = "sid"
+                          , A.resjunk = False
+                          }
+                        , A.TargetEntry
+                          { A.targetexpr =
+                            A.AGGREF
+                            { A.aggname = "min"
+                            , A.aggargs =
+                              [ A.TargetEntry
+                                { A.targetexpr = A.VARPOS "OUTER_VAR" 5
+                                , A.targetresname = "grade"
+                                , A.resjunk = False
+                                }
+                              ]
+                            , A.aggdirectargs = []
+                            , A.aggorder = []
+                            , A.aggdistinct = []
+                            , A.aggfilter = Nothing
+                            , A.aggstar = False
+                            }
+                          , A.targetresname = "min"
+                          , A.resjunk = False }
+                        ]
+                      , A.operator =
+                        A.SEQSCAN
+                        { A.targetlist =
+                          [ A.TargetEntry
+                            { A.targetexpr = A.VARPOS "exams" 1
+                            , A.targetresname = "sid"
+                            , A.resjunk = False
+                            }
+                          , A.TargetEntry
+                            { A.targetexpr = A.VARPOS "exams" 2
+                            , A.targetresname = "course"
+                            , A.resjunk = False
+                            }
+                          , A.TargetEntry
+                            { A.targetexpr = A.VARPOS "exams" 3
+                            , A.targetresname = "curriculum"
+                            , A.resjunk = False
+                            }
+                          , A.TargetEntry
+                            { A.targetexpr = A.VARPOS "exams" 4
+                            , A.targetresname = "date"
+                            , A.resjunk = False
+                            }
+                          , A.TargetEntry
+                            { A.targetexpr = A.VARPOS "exams" 5
+                            , A.targetresname = "grade"
+                            , A.resjunk = False
+                            }
+                          ]
+                        , A.qual = []
+                        , A.scanrelation = "exams"
+                        }
+                      , A.groupCols = [1]
+                      , A.aggstrategy = A.AGG_HASHED
+                      , A.aggsplit    = [A.AGGSPLITOP_SIMPLE]
+                      }
+                    , A.righttree =
+                      A.HASH
+                      { A.targetlist =
+                        [ A.TargetEntry
+                          { A.targetexpr = A.VARPOS "OUTER_VAR" 1
+                          , A.targetresname = "course"
+                          , A.resjunk = False
+                          }
+                        , A.TargetEntry
+                          { A.targetexpr = A.VARPOS "OUTER_VAR" 2
+                          , A.targetresname = "sid"
+                          , A.resjunk = False
+                          }
+                        , A.TargetEntry
+                          { A.targetexpr = A.VARPOS "OUTER_VAR" 3
+                          , A.targetresname = "grade"
+                          , A.resjunk = False
+                          }
+                        ]
+                      , A.qual = []
+                      , A.operator =
+                        A.SEQSCAN
+                        { A.targetlist =
+                          [ A.TargetEntry
+                            { A.targetexpr = A.VARPOS "exams" 2
+                            , A.targetresname = "course"
+                            , A.resjunk = False
+                            }
+                          , A.TargetEntry
+                            { A.targetexpr = A.VARPOS "exams" 1
+                            , A.targetresname = "sid"
+                            , A.resjunk = False
+                            }
+                          , A.TargetEntry
+                            { A.targetexpr = A.VARPOS "exams" 5
+                            , A.targetresname = "grade"
+                            , A.resjunk = False
+                            }
+                          ]
+                        , A.qual = []
+                        , A.scanrelation = "exams"
+                        }
+                      , A.skewTable = "exams"
+                      , A.skewColumn = 0
+                      }
+                    }
+                  , A.skewTable = "students"
+                  , A.skewColumn = 1
+                  }
+                }
+              , A.subplans =
+                []
+              }
+
+--------------------------------------------------------------------------------
+
+
 -- access list elements safely
 (!!) :: [a] -> Int -> Maybe a
 (!!) lst idx = if idx >= length lst
@@ -1480,7 +1892,7 @@ checkAndGenerateStmt authStr op = do
   putStrLn $ PP.ppShow infered
   let pgplan = gprint infered
   putStrLn $ "Explain: "
-  putStrLn $ "select _pq_plan_explain('" ++ pgplan ++ "');"
+  putStrLn $ "select _pq_plan_explain('" ++ pgplan ++ "', true);"
   putStrLn $ "Execute:"
   putStrLn $ "select _pq_plan_deserialize('" ++ pgplan ++ "');"
 
@@ -1496,5 +1908,5 @@ main = do
     let cp = forceEither config
     let authStr = forceEither $ get cp "Main" "dbauth" :: String
 
-    checkAndGenerate authStr paragg
-    -- checkAndGenerateStmt authStr ctescan2
+    -- checkAndGenerate authStr paragg
+    checkAndGenerateStmt authStr neumannQ1'
