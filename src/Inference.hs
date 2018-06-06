@@ -1538,7 +1538,7 @@ trTargetEntry (I.TargetEntry { I.targetexpr, I.targetresname, I.resjunk }, resno
 -- | Generates a SUBPLAN node
 -- We statically generate a param for each subplan node,
 -- this might be incorrect, but will do for now.
-trSubPlan :: Rule2 String (Integer, O.Plan) O.Plan
+trSubPlan :: Rule2 String (Integer, O.Plan) O.Expr
 trSubPlan name (n, x) = do
     let (O.GenericPlan {O.plan_node_id, O.targetlist}) = O.genericPlan x
 
@@ -1559,7 +1559,7 @@ trSubPlan name (n, x) = do
               , O._parallel_safe    = O.PgBool False
               , O.setParam          = O.IndexList []
               , O.parParam          = O.IndexList []
-              , O.__args            = O.List []
+              , O.args            = O.List []
               , O._startup_cost     = 0.0
               , O.per_call_cost     = 0.0
               }
@@ -1609,6 +1609,38 @@ trExpr v@(I.VAR { I.varTable, I.varColumn })
               , O.varoattno   = cAttnum column
               , O.location    = -1
               }
+
+trExpr v@(I.VARPOS { I.varTable, I.varPos })
+  = do
+    rtables <- getRTables ()
+    let rtable' = filter (\x -> tName x == varTable) rtables
+    let rtable = case rtable' of
+                  r:_ -> r
+                  err -> error $ "No table found: " ++ PP.ppShow v ++ "\n" ++ PP.ppShow rtables
+    let column' = (tCols rtable) !! (fromIntegral varPos-1)
+    let column = column'
+    let tableKind = tKind rtable
+    -- Calculate the index of the table in rtable of PlannedStmt
+    let (Just index) = elemIndex rtable rtables
+    -- Postgres enumerates these indizes from 1, so we have to increment the value
+    let index' = case varTable of
+                  "INNER_VAR" -> 65000
+                  "OUTER_VAR" -> 65001
+                  "INDEX_VAR" -> 65002
+                  _ -> if tableKind == "i" then 65002 else fromIntegral index + 1
+
+    return $ O.VAR
+              { O.varno       = index'
+              , O.varattno    = cAttnum column
+              , O.vartype     = cAtttypid column
+              , O.vartypmod   = cAtttypmod column
+              , O.varcollid   = cAttcollation column
+              , O.varlevelsup = 0
+              , O.varnoold    = index'
+              , O.varoattno   = cAttnum column
+              , O.location    = -1
+              }
+
 
 trExpr n@(I.FUNCEXPR { I.funcname, I.funcargs })
   = do
@@ -1905,6 +1937,60 @@ trExpr (I.NOT { I.arg })
             , O.location = -1
             }
 
+trExpr (I.PARAM { I.paramkind, I.paramid, I.paramtype })
+  = do
+
+    row <- getRTableRow (pg_type, findRow "typname" paramtype)
+
+    when (null row) $ error $ "type not found: " ++ show paramtype
+
+    let typid = fromSql $ (\(x:_) -> x) row M.! "oid"
+    let typcollid = fromSql $ (\(x:_) -> x) row M.! "typcollation"
+
+    return $ O.PARAM
+              { O.paramkind = I.paramKindToInt paramkind
+              , O.paramid   = paramid
+              , O.paramtype = typid
+              , O.paramtypmod = -1
+              , O.paramcollid = typcollid
+              , O.location    = -1
+              }
+
+trExpr (I.SUBPLAN { I.sublinkType, I.testExpr, I.paramIds, I.plan_id, I.plan_name, I.firstColType, I.setParam, I.parParam, I.args })
+  = do
+    testExpr' <- mapM trExpr testExpr
+    args'     <- mapM trExpr args
+
+    row <- getRTableRow (pg_type, findRow "typname" firstColType)
+
+    when (null row) $ error $ "type not found: " ++ show firstColType
+
+    let typid = fromSql $ (\(x:_) -> x) row M.! "oid"
+    let typcollid = fromSql $ (\(x:_) -> x) row M.! "typcollation"
+
+
+    -- Have to do bookkeeping about the number of params 'generated'
+    incrParam 1
+
+    return $ O.SUBPLAN
+              { O.subLinkType       = I.sublinkToInt sublinkType
+              , O.testexpr          = testExpr'
+              , O.paramIds          = O.List paramIds
+              , O.plan_id           = plan_id
+              , O.plan_name         = plan_name
+              , O.firstColType      = typid
+              , O.firstColTypmod    = typcollid
+              , O.firstColCollation = 0
+              , O.useHashTable      = O.PgBool False
+              , O.unknownEqFalse    = O.PgBool False
+              , O._parallel_safe    = O.PgBool False
+              , O.setParam          = O.IndexList setParam
+              , O.parParam          = O.IndexList parParam
+              , O.args              = O.List args'
+              , O._startup_cost     = 0.0
+              , O.per_call_cost     = 0.0
+              }
+
 trExpr err = error $ "trExpr not implemented: \n" ++ PP.ppShow err
 
 --------------------------------------------------------------------------------
@@ -1922,6 +2008,9 @@ getExprType (O.AGGREF { O.aggtype, O.aggargtypes }) = do
   if isParAgg
     then return $ head rl
     else return aggtype
+
+getExprType (O.PARAM { O.paramtype }) = return paramtype
+getExprType (O.SUBPLAN { O.firstColType }) = return firstColType
 
 getExprType x = error $ "getExprType not implemented for: " ++ PP.ppShow x
 

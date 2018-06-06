@@ -22,7 +22,11 @@ module InAST ( PlannedStmt(..)
              , aggSPLIT_INITIAL_SERIAL
              , aggSPLIT_FINAL_DESERIAL
              , FrameOptions(..)
-             , frameOptionToBits ) where
+             , frameOptionToBits
+             , SublinkType(..)
+             , sublinkToInt
+             , ParamKind(..)
+             , paramKindToInt ) where
 
 data PlannedStmt = PlannedStmt
                     { planTree :: Operator
@@ -276,6 +280,10 @@ data Expr = VAR
             { varTable  :: String
             , varColumn :: String
             }
+          | VARPOS
+            { varTable :: String
+            , varPos   :: Integer
+            }
           | SCANVAR
             { colPos :: Integer }
           | CONST
@@ -309,6 +317,22 @@ data Expr = VAR
           | AND { args :: [Expr] }
           | OR  { args :: [Expr] }
           | NOT { arg  :: Expr }
+          | SUBPLAN
+            { sublinkType :: SublinkType
+            , testExpr    :: Maybe Expr
+            , paramIds    :: [Integer]
+            , plan_id     :: Integer
+            , plan_name   :: String
+            , firstColType :: String
+            , setParam    :: [Integer]
+            , parParam    :: [Integer]
+            , args        :: [Expr]
+            }
+          | PARAM
+            { paramkind :: ParamKind
+            , paramid   :: Integer
+            , paramtype :: String
+            }
     deriving (Eq, Show)
 
 data JoinType = INNER
@@ -318,6 +342,38 @@ data JoinType = INNER
               | SEMI
               | ANTI
     deriving (Eq, Show)
+
+data ParamKind = PARAM_EXTERN
+               | PARAM_EXEC
+               | PARAM_SUBLINK
+               | PARAM_MULTIEXPR
+    deriving(Eq, Show)
+
+paramKindToInt :: ParamKind -> Integer
+paramKindToInt PARAM_EXTERN    = 0
+paramKindToInt PARAM_EXEC      = 1
+paramKindToInt PARAM_SUBLINK   = 2
+paramKindToInt PARAM_MULTIEXPR = 3
+
+data SublinkType = EXISTS_SUBLINK
+                 | ALL_SUBLINK
+                 | ANY_SUBLINK
+                 | ROWCOMPARE_SUBLINK
+                 | EXPR_SUBLINK
+                 | MULTIEXPR_SUBLINK
+                 | ARRAY_SUBLINK
+                 | CTE_SUBLINK
+    deriving(Eq, Show)
+
+sublinkToInt :: SublinkType -> Integer
+sublinkToInt EXISTS_SUBLINK     = 0
+sublinkToInt ALL_SUBLINK        = 1
+sublinkToInt ANY_SUBLINK        = 2
+sublinkToInt ROWCOMPARE_SUBLINK = 3
+sublinkToInt EXPR_SUBLINK       = 4
+sublinkToInt MULTIEXPR_SUBLINK  = 5
+sublinkToInt ARRAY_SUBLINK      = 6
+sublinkToInt CTE_SUBLINK        = 7
 
 data AggStrategy = AGG_PLAIN
                  | AGG_SORTED

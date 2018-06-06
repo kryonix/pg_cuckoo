@@ -368,3 +368,10 @@ validateExpr op = let
 (~~>) (AND { args }) = mapM_ (~~>) args
 (~~>) (OR { args }) = mapM_ (~~>) args
 (~~>) (NOT { arg }) = (~~>) arg
+
+(~~>) (SUBPLAN { testExpr, args })
+  = do
+    mapM_ (~~>) testExpr
+    mapM_ (~~>) args
+
+(~~>) e = return ()

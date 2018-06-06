@@ -185,7 +185,7 @@ data GenericPlan = GenericPlan
                     , qual           :: List Expr -- implicitly-ANDed qual conditions
                     , lefttree       :: Maybe Plan -- input plan tree(s)
                     , righttree      :: Maybe Plan -- input
-                    , initPlan       :: List Plan -- Init Plan nodes (un-correlated expr subselects)
+                    , initPlan       :: List Expr -- Init Plan nodes (un-correlated expr subselects)
                     , extParam       :: Bitmapset  -- (b id₁ ... idₙ)
                     , allParam       :: Bitmapset  -- (b id₁ ... idₙ)
                     }
@@ -442,24 +442,6 @@ data Plan = RESULT
             , firstFlag    :: Integer
             , numGroups    :: Integer
             }
-          | SUBPLAN
-            { subLinkType       :: Integer
-            , testexpr          :: Maybe Expr
-            , paramIds          :: List Integer
-            , plan_id           :: Integer
-            , plan_name         :: String
-            , firstColType      :: Integer
-            , firstColTypmod    :: Integer
-            , firstColCollation :: Integer
-            , useHashTable      :: PgBool
-            , unknownEqFalse    :: PgBool
-            , _parallel_safe    :: PgBool
-            , setParam          :: IndexList   -- ^ initplan subqueries have to set these Params for parent plan
-            , parParam          :: IndexList   -- ^ indices of input Params from parent plan
-            , __args            :: List Expr   -- ^ exprs to pass as parParam values
-            , _startup_cost     :: Double
-            , per_call_cost     :: Double
-            }
     deriving (Eq, Show, Generic, GPrint)
 
 data NestLoopParam = FIXME Null
@@ -690,6 +672,32 @@ data Expr = VAR
             { boolop   :: String
             , args     :: List Expr
             , location :: Integer
+            }
+          | SUBPLAN
+            { subLinkType       :: Integer
+            , testexpr          :: Maybe Expr
+            , paramIds          :: List Integer
+            , plan_id           :: Integer
+            , plan_name         :: String
+            , firstColType      :: Integer
+            , firstColTypmod    :: Integer
+            , firstColCollation :: Integer
+            , useHashTable      :: PgBool
+            , unknownEqFalse    :: PgBool
+            , _parallel_safe    :: PgBool
+            , setParam          :: IndexList   -- ^ initplan subqueries have to set these Params for parent plan
+            , parParam          :: IndexList   -- ^ indices of input Params from parent plan
+            , args              :: List Expr   -- ^ exprs to pass as parParam values
+            , _startup_cost     :: Double
+            , per_call_cost     :: Double
+            }
+          | PARAM
+            { paramkind   :: Integer
+            , paramid     :: Integer
+            , paramtype   :: Integer
+            , paramtypmod :: Integer
+            , paramcollid :: Integer
+            , location    :: Integer
             }
     deriving (Eq, Show, Generic, GPrint)
 
