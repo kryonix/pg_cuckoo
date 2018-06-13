@@ -405,9 +405,9 @@ trOperator n@(I.LIMIT { I.operator, I.limitOffset, I.limitCount })
       $ error $ "Type error: limitOffset is not an int8"
               ++ "\n" ++ PP.ppShow n
 
-    when (isJust limitCount' && lType /= 20)
-      $ error $ "Type error: limitCount is not an int8"
-              ++ "\n" ++ PP.ppShow n
+    -- when (isJust limitCount' && lType /= 20)
+    --   $ error $ "Type error: limitCount is not an int8"
+    --           ++ "\n" ++ PP.ppShow n
 
     return $ O.LIMIT (O.defaultPlan { O.targetlist=O.targetlist (O.genericPlan operator')
                                     , O.lefttree=Just operator' }) limitOffset' limitCount'
@@ -809,7 +809,7 @@ trOperator (I.AGG {I.targetlist, I.operator, I.groupCols, I.aggstrategy, I.aggsp
 
 
     grpTargets <- mapM (getExprType . O.expr)
-                          $ filter (\(O.TARGETENTRY {O.ressortgroupref=x}) -> x `elem` groupCols) targetlist'
+                          $ filter (\(O.TARGETENTRY {O.ressortgroupref=x}) -> x `elem` groupCols) ((\(O.List x) -> x) $ O.targetlist $ O.genericPlan operator') -- targetlist'
 
     -- Try to find function in pg_operator by name and argument types
     ops <- mapM ((liftM fst) . searchOperator) $ zip grpTargets (repeat "=")
@@ -1347,6 +1347,9 @@ trOperator s@(I.HASH {I.targetlist, I.qual, I.operator, I.skewTable, I.skewColum
     qual' <- local (const context') $ mapM trExpr qual
 
     let rtable:_ = filter (\x -> tName x == skewTable) rtablesC
+    let oid = case skewTable of
+                "none" -> -1
+                _      -> tOID rtable
 
     return $ O.HASH
               { O.genericPlan = O.defaultPlan
@@ -1354,7 +1357,7 @@ trOperator s@(I.HASH {I.targetlist, I.qual, I.operator, I.skewTable, I.skewColum
                                 , O.qual       = O.List qual'
                                 , O.lefttree   = Just operator'
                                 }
-              , O.skewTable = tOID rtable
+              , O.skewTable = oid
               , O.skewColumn = skewColumn
               , O.skewInherit = O.PgBool False
               }
@@ -1649,13 +1652,25 @@ trExpr n@(I.FUNCEXPR { I.funcname, I.funcargs })
     -- Type check
     argTypes <- mapM getExprType funcargs'
 
+    let proallargtypesDB x = DB.safeFromSql $ x M.! "proallargtypes" :: ConvertResult String
+    let proallargtypes p = case proallargtypesDB p of
+                            -- Second chance if conversion of proallargtypes fails.
+                            Left x -> fromSql $ p M.! "proargtypes"
+                            Right x -> x
+
+    let proallargtypesSplit x = if (all isJust proallargtypes')
+                                  then catMaybes proallargtypes'
+                                  else error $ "getProcData error while reading proallargtypes: " ++ show x
+          where proallargtypes' = (map TR.readMaybe $ words (proallargtypes x) :: [Maybe Integer])
+
     -- Get tables from context, we have to do it that way instead of via
     -- findRow, because we need to perform a search using multiple qualifications.
     td <- getRTableData ()
     let table = pg_proc td
     -- Try to find function in pg_operator by name and argument types
     let procrow = filter (\x -> x M.! "proname" == (DB.toSql funcname)
-                             && x M.! "pronargs" == (DB.toSql (length funcargs))) table
+                             && x M.! "pronargs" == (DB.toSql (length funcargs))
+                             && proallargtypesSplit x == argTypes) table
 
     -- Error if the function does not exist
     when (null procrow) $ error $ "FUNCEXPR: function " ++ funcname ++ " not found."
@@ -2011,8 +2026,21 @@ getExprType (O.AGGREF { O.aggtype, O.aggargtypes }) = do
 
 getExprType (O.PARAM { O.paramtype }) = return paramtype
 getExprType (O.SUBPLAN { O.firstColType }) = return firstColType
+getExprType (O.BOOLEXPR {}) = return 16
 
 getExprType x = error $ "getExprType not implemented for: " ++ PP.ppShow x
+
+getExprCollation :: Rule O.Expr Integer
+getExprCollation (O.VAR { O.varcollid }) = return varcollid
+getExprCollation (O.CONST { O.constcollid }) = return constcollid
+getExprCollation (O.FUNCEXPR { O.funccollid }) = return funccollid
+getExprCollation (O.OPEXPR { O.opcollid }) = return opcollid
+getExprCollation (O.AGGREF { O.aggcollid }) = return aggcollid
+getExprCollation (O.WINDOWFUNC { O.wincollid }) = return wincollid
+getExprCollation (O.RANGETBLFUNCTION {}) = return 0
+getExprCollation (O.BOOLEXPR {}) = return 0
+getExprCollation (O.SUBPLAN { O.firstColCollation }) = return firstColCollation
+getExprCollation (O.PARAM { O.paramcollid }) = return paramcollid
 
 --------------------------------------------------------------------------------
 -- Datatypes and functions to access pg catalog information

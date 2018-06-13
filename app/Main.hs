@@ -1815,8 +1815,1150 @@ neumannQ1' = A.PlannedStmt
                 []
               }
 
---------------------------------------------------------------------------------
+seqExams :: A.Operator
+seqExams = A.SEQSCAN
+            { A.targetlist =
+              [ A.TargetEntry
+                { A.targetexpr = A.VARPOS "exams" 1
+                , A.targetresname = "sid"
+                , A.resjunk = False
+                }
+              , A.TargetEntry
+                { A.targetexpr = A.VARPOS "exams" 2
+                , A.targetresname = "course"
+                , A.resjunk = False
+                }
+              , A.TargetEntry
+                { A.targetexpr = A.VARPOS "exams" 3
+                , A.targetresname = "curriculum"
+                , A.resjunk = False
+                }
+              , A.TargetEntry
+                { A.targetexpr = A.VARPOS "exams" 4
+                , A.targetresname = "date"
+                , A.resjunk = False
+                }
+              , A.TargetEntry
+                { A.targetexpr = A.VARPOS "exams" 5
+                , A.targetresname = "grade"
+                , A.resjunk = False
+                }
+              ]
+            , A.qual = []
+            , A.scanrelation = "exams"
+            }
 
+seqStudents :: A.Operator
+seqStudents = A.SEQSCAN
+              { A.targetlist =
+                [ A.TargetEntry
+                  { A.targetexpr = A.VARPOS "students" 1
+                  , A.targetresname = "id"
+                  , A.resjunk = False
+                  }
+                , A.TargetEntry
+                  { A.targetexpr = A.VARPOS "students" 2
+                  , A.targetresname = "name"
+                  , A.resjunk = False
+                  }
+                , A.TargetEntry
+                  { A.targetexpr = A.VARPOS "students" 3
+                  , A.targetresname = "major"
+                  , A.resjunk = False
+                  }
+                , A.TargetEntry
+                  { A.targetexpr = A.VARPOS "students" 4
+                  , A.targetresname = "year"
+                  , A.resjunk = False
+                  }
+                ]
+              , A.qual = []
+              , A.scanrelation = "students"
+              }
+
+j1 :: A.Operator
+j1 = A.HASHJOIN
+      { A.targetlist =
+        [ A.TargetEntry
+          { A.targetexpr = A.VARPOS "OUTER_VAR" 2
+          , A.targetresname = "name"
+          , A.resjunk = False
+          }
+        , A.TargetEntry
+          { A.targetexpr = A.VARPOS "OUTER_VAR" 1
+          , A.targetresname = "id"
+          , A.resjunk = False
+          }
+        , A.TargetEntry
+          { A.targetexpr = A.VARPOS "INNER_VAR" 2
+          , A.targetresname = "course"
+          , A.resjunk = False
+          }
+        ]
+      , A.joinType = A.INNER
+      , A.inner_unique = False
+      , A.joinquals = []
+      , A.hashclauses =
+        [ A.OPEXPR
+          { A.oprname = "="
+          , A.oprargs =
+            [ A.VARPOS "OUTER_VAR" 1
+            , A.VARPOS "INNER_VAR" 1
+            ]
+          }
+        ]
+      , A.lefttree = seqStudents
+      , A.righttree =
+        A.HASH
+        { A.targetlist =
+          [ A.TargetEntry
+            { A.targetexpr = A.VARPOS "exams" 1
+            , A.targetresname = "sid"
+            , A.resjunk = False
+            }
+          , A.TargetEntry
+            { A.targetexpr = A.VARPOS "exams" 2
+            , A.targetresname = "course"
+            , A.resjunk = False
+            }
+          , A.TargetEntry
+            { A.targetexpr = A.VARPOS "exams" 3
+            , A.targetresname = "curriculum"
+            , A.resjunk = False
+            }
+          , A.TargetEntry
+            { A.targetexpr = A.VARPOS "exams" 4
+            , A.targetresname = "date"
+            , A.resjunk = False
+            }
+          , A.TargetEntry
+            { A.targetexpr = A.VARPOS "exams" 5
+            , A.targetresname = "grade"
+            , A.resjunk = False
+            }
+          ]
+        , A.qual = []
+        , A.operator = seqExams
+        , A.skewTable = "exams"
+        , A.skewColumn = 0
+        }
+      }
+
+s1 :: A.Operator
+s1 = A.AGG
+      { A.targetlist =
+        [ A.TargetEntry
+          { A.targetexpr = A.VARPOS "OUTER_VAR" 1
+          , A.targetresname = "sid"
+          , A.resjunk = False
+          }
+        , A.TargetEntry
+          { A.targetexpr =
+            A.AGGREF
+            { A.aggname = "min"
+            , A.aggargs =
+              [ A.TargetEntry
+                { A.targetexpr = A.VARPOS "OUTER_VAR" 5
+                , A.targetresname = "grade"
+                , A.resjunk = False
+                }
+              ]
+            , A.aggdirectargs = []
+            , A.aggorder = []
+            , A.aggdistinct = []
+            , A.aggfilter = Nothing
+            , A.aggstar = False
+            }
+          , A.targetresname = "min"
+          , A.resjunk = False
+          }
+        ]
+      , A.operator = seqExams
+      , A.groupCols = [1]
+      , A.aggstrategy = A.AGG_HASHED
+      , A.aggsplit = [A.AGGSPLITOP_SIMPLE]
+      }
+
+neumannQ1'' :: A.PlannedStmt
+neumannQ1'' = A.PlannedStmt
+              { A.planTree =
+                A.HASHJOIN
+                { A.targetlist =
+                  [ A.TargetEntry
+                    { A.targetexpr = A.VARPOS "OUTER_VAR" 1
+                    , A.targetresname = "name"
+                    , A.resjunk = False
+                    }
+                  -- , A.TargetEntry
+                  --   { A.targetexpr = A.VARPOS "INNER_VAR" 2
+                  --   , A.targetresname = "course"
+                  --   , A.resjunk = False
+                  --   }
+                  , A.TargetEntry
+                    { A.targetexpr = A.VARPOS "OUTER_VAR" 3
+                    , A.targetresname = "course"
+                    , A.resjunk = False
+                    }
+                  ]
+                , A.joinType = A.INNER
+                , A.inner_unique = False
+                , A.joinquals = []
+                , A.hashclauses =
+                  [ A.OPEXPR
+                    { A.oprname = "="
+                    , A.oprargs =
+                      [ A.VARPOS "OUTER_VAR" 2
+                      , A.VARPOS "INNER_VAR" 1
+                      ]
+                    }
+                  ]
+                , A.lefttree = j1
+                , A.righttree =
+                  A.HASH
+                  { A.targetlist =
+                    [ A.TargetEntry
+                      { A.targetexpr = A.VARPOS "OUTER_VAR" 1
+                      , A.targetresname = "sid"
+                      , A.resjunk = False
+                      }
+                    , A.TargetEntry
+                      { A.targetexpr = A.VARPOS "OUTER_VAR" 2
+                      , A.targetresname = "grade"
+                      , A.resjunk = False
+                      }
+                    ]
+                  , A.qual = []
+                  , A.operator = s1
+                  , A.skewTable = "exams"
+                  , A.skewColumn = 0
+                  }
+                }
+              , A.subplans = []
+              }
+
+--------------------------------------------------------------------------------
+-- NEUMANN unnesting Q2
+
+seqStudentsFilter = seqStudents 
+                    { A.qual = 
+                      [ A.OR
+                        { A.args =
+                          [ A.OPEXPR
+                            { A.oprname = "="
+                            , A.oprargs =
+                              [ A.VAR "students" "major"
+                              , A.CONST "CS" "text"
+                              ]
+                            }
+                          , A.OPEXPR
+                            { A.oprname = "="
+                            , A.oprargs =
+                              [ A.VAR "students" "major"
+                              , A.CONST "Games Eng" "text"
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+
+q2Join1 = A.HASHJOIN
+          { A.targetlist =
+            [ A.TargetEntry
+              { A.targetexpr = A.VARPOS "OUTER_VAR" 2
+              , A.targetresname = "name"
+              , A.resjunk = False
+              }
+            , A.TargetEntry
+              { A.targetexpr = A.VARPOS "OUTER_VAR" 1
+              , A.targetresname = "id"
+              , A.resjunk = False
+              }
+            , A.TargetEntry
+              { A.targetexpr = A.VARPOS "OUTER_VAR" 3
+              , A.targetresname = "major"
+              , A.resjunk = False
+              }
+            , A.TargetEntry
+              { A.targetexpr = A.VARPOS "OUTER_VAR" 4
+              , A.targetresname = "year"
+              , A.resjunk = False
+              }
+            , A.TargetEntry
+              { A.targetexpr = A.VARPOS "INNER_VAR" 2
+              , A.targetresname = "course"
+              , A.resjunk = False
+              }
+            , A.TargetEntry
+              { A.targetexpr = A.VARPOS "INNER_VAR" 3
+              , A.targetresname = "curriculum"
+              , A.resjunk = False
+              }
+            , A.TargetEntry
+              { A.targetexpr = A.VARPOS "INNER_VAR" 4
+              , A.targetresname = "date"
+              , A.resjunk = False
+              }
+            , A.TargetEntry
+              { A.targetexpr = A.VARPOS "INNER_VAR" 5
+              , A.targetresname = "grade"
+              , A.resjunk = False
+              }
+            ]
+          , A.joinType = A.INNER
+          , A.inner_unique = False
+          , A.joinquals = []
+          , A.hashclauses =
+            [ A.OPEXPR
+              { A.oprname = "="
+              , A.oprargs =
+                [ A.VARPOS "OUTER_VAR" 1
+                , A.VARPOS "INNER_VAR" 1
+                ]
+              }
+            ]
+          , A.lefttree = seqStudentsFilter
+          , A.righttree =
+            A.HASH
+            { A.targetlist =
+              [ A.TargetEntry
+                { A.targetexpr = A.VARPOS "exams" 1
+                , A.targetresname = "sid"
+                , A.resjunk = False
+                }
+              , A.TargetEntry
+                { A.targetexpr = A.VARPOS "exams" 2
+                , A.targetresname = "course"
+                , A.resjunk = False
+                }
+              , A.TargetEntry
+                { A.targetexpr = A.VARPOS "exams" 3
+                , A.targetresname = "curriculum"
+                , A.resjunk = False
+                }
+              , A.TargetEntry
+                { A.targetexpr = A.VARPOS "exams" 4
+                , A.targetresname = "date"
+                , A.resjunk = False
+                }
+              , A.TargetEntry
+                { A.targetexpr = A.VARPOS "exams" 5
+                , A.targetresname = "grade"
+                , A.resjunk = False
+                }
+              ]
+            , A.qual = []
+            , A.operator =
+              seqExams
+            , A.skewTable = "exams"
+            , A.skewColumn = 0
+            }
+          }
+
+q2Join2 = A.HASHJOIN
+          { A.targetlist =
+            [ A.TargetEntry
+              { A.targetexpr = A.VARPOS "OUTER_VAR" 2
+              , A.targetresname = "id"
+              , A.resjunk = False
+              }
+            , A.TargetEntry
+              { A.targetexpr = A.VARPOS "OUTER_VAR" 4
+              , A.targetresname = "year"
+              , A.resjunk = False
+              }
+            , A.TargetEntry
+              { A.targetexpr = A.VARPOS "OUTER_VAR" 3
+              , A.targetresname = "major"
+              , A.resjunk = False
+              }
+            , A.TargetEntry
+              { A.targetexpr = A.VARPOS "INNER_VAR" 2
+              , A.targetresname = "course"
+              , A.resjunk = False
+              }
+            , A.TargetEntry
+              { A.targetexpr = A.VARPOS "INNER_VAR" 3
+              , A.targetresname = "curriculum"
+              , A.resjunk = False
+              }
+            , A.TargetEntry
+              { A.targetexpr = A.VARPOS "INNER_VAR" 4
+              , A.targetresname = "date"
+              , A.resjunk = False
+              }
+            , A.TargetEntry
+              { A.targetexpr = A.VARPOS "INNER_VAR" 5
+              , A.targetresname = "grade"
+              , A.resjunk = False
+              }
+            ]
+          , A.joinType = A.INNER
+          , A.inner_unique = False
+          , A.joinquals =
+            [ A.OR
+              { A.args =
+                [ A.OPEXPR
+                  { A.oprname = "="
+                  , A.oprargs =
+                    [ A.VARPOS "OUTER_VAR" 2
+                    , A.VARPOS "INNER_VAR" 1
+                    ]
+                  }
+                , A.AND
+                  { A.args =
+                    [ A.OPEXPR
+                      { A.oprname = ">"
+                      , A.oprargs =
+                        [ A.VARPOS "OUTER_VAR" 4
+                        , A.VARPOS "INNER_VAR" 4
+                        ]
+                      }
+                    , A.OPEXPR
+                      { A.oprname = "="
+                      , A.oprargs =
+                        [ A.VARPOS "OUTER_VAR" 3
+                        , A.VARPOS "INNER_VAR" 3
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          , A.hashclauses =
+            [ A.OPEXPR
+              { A.oprname = "="
+              , A.oprargs =
+                [ A.VARPOS "OUTER_VAR" 2
+                , A.VARPOS "INNER_VAR" 1
+                ]
+              }
+            ]
+          , A.lefttree = q2Join1
+          , A.righttree =
+            A.HASH
+            { A.targetlist =
+              [ A.TargetEntry
+                { A.targetexpr = A.VARPOS "exams" 1
+                , A.targetresname = "sid"
+                , A.resjunk = False
+                }
+              , A.TargetEntry
+                { A.targetexpr = A.VARPOS "exams" 2
+                , A.targetresname = "course"
+                , A.resjunk = False
+                }
+              , A.TargetEntry
+                { A.targetexpr = A.VARPOS "exams" 3
+                , A.targetresname = "curriculum"
+                , A.resjunk = False
+                }
+              , A.TargetEntry
+                { A.targetexpr = A.VARPOS "exams" 4
+                , A.targetresname = "date"
+                , A.resjunk = False
+                }
+              , A.TargetEntry
+                { A.targetexpr = A.VARPOS "exams" 5
+                , A.targetresname = "grade"
+                , A.resjunk = False
+                }
+              ]
+            , A.qual = []
+            , A.operator =
+              seqExams
+            , A.skewTable = "exams"
+            , A.skewColumn = 0
+            }
+          }
+
+q2Agg = A.AGG
+        { A.targetlist =
+          [ A.TargetEntry
+            { A.targetexpr = A.VARPOS "OUTER_VAR" 1
+            , A.targetresname = "id"
+            , A.resjunk = False
+            }
+          , A.TargetEntry
+            { A.targetexpr = A.VARPOS "OUTER_VAR" 2
+            , A.targetresname = "year"
+            , A.resjunk = False
+            }
+          , A.TargetEntry
+            { A.targetexpr = A.VARPOS "OUTER_VAR" 3
+            , A.targetresname = "major"
+            , A.resjunk = False
+            }
+          , A.TargetEntry
+            { A.targetexpr =
+              A.AGGREF
+              { A.aggname = "avg"
+              , A.aggargs =
+                [ A.TargetEntry
+                  { A.targetexpr = A.VARPOS "OUTER_VAR" 7
+                  , A.targetresname = "grade"
+                  , A.resjunk = False
+                  }
+                ]
+              , A.aggdirectargs = []
+              , A.aggorder = []
+              , A.aggdistinct = []
+              , A.aggfilter = Nothing
+              , A.aggstar = False
+              }
+            , A.targetresname = "avg"
+            , A.resjunk = False
+            }
+          ]
+        , A.operator = q2Join2
+        , A.groupCols = [1, 2, 3]
+        , A.aggstrategy = A.AGG_HASHED
+        , A.aggsplit = [A.AGGSPLITOP_SIMPLE]
+        }
+
+q2Join3 = A.NESTLOOP
+          { A.targetlist =
+            [ A.TargetEntry
+              { A.targetexpr = A.VARPOS "OUTER_VAR" 1
+              , A.targetresname = "name"
+              , A.resjunk = False
+              }
+            , A.TargetEntry
+              { A.targetexpr = A.VARPOS "OUTER_VAR" 5
+              , A.targetresname = "course"
+              , A.resjunk = False
+              }
+            ]
+          , A.joinType = A.INNER
+          , A.inner_unique = False
+          , A.joinquals =
+            [ {-A.OPEXPR
+              { A.oprname = ">"
+              , A.oprargs =
+                [ A.FUNCEXPR
+                  { A.funcname = "numeric"
+                  , A.funcargs = [ A.VARPOS "OUTER_VAR" 8 ]
+                  }
+                , A.OPEXPR
+                  { A.oprname = "+"
+                  , A.oprargs =
+                    [ A.VARPOS "INNER_VAR" 4
+                    , A.CONST "1" "numeric"
+                    ]
+                  }
+                ]
+              }
+            , A.OR
+              { A.args =
+                [ A.OPEXPR
+                  { A.oprname = "="
+                  , A.oprargs =
+                    [ A.VARPOS "INNER_VAR" 1
+                    , A.VARPOS "OUTER_VAR" 2
+                    ]
+                  }
+                , A.AND
+                  { A.args =
+                    [ A.OPEXPR
+                      { A.oprname = ">"
+                      , A.oprargs =
+                        [ A.VARPOS "INNER_VAR" 2
+                        , A.VARPOS "OUTER_VAR" 7
+                        ]
+                      }
+                    , A.OPEXPR
+                      { A.oprname = "="
+                      , A.oprargs =
+                        [ A.VARPOS "OUTER_VAR" 6
+                        , A.VARPOS "INNER_VAR" 3
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }-}
+            ]
+          , A.nestParams =
+            []
+          , A.lefttree = q2Join1
+          , A.righttree = q2Agg
+            -- A.HASH
+            -- { A.targetlist =
+            --   [ A.TargetEntry
+            --     { A.targetexpr = A.VARPOS "OUTER_VAR" 1
+            --     , A.targetresname = "id"
+            --     , A.resjunk = False
+            --     }
+            --   , A.TargetEntry
+            --     { A.targetexpr = A.VARPOS "OUTER_VAR" 2
+            --     , A.targetresname = "year"
+            --     , A.resjunk = False
+            --     }
+            --   , A.TargetEntry
+            --     { A.targetexpr = A.VARPOS "OUTER_VAR" 3
+            --     , A.targetresname = "major"
+            --     , A.resjunk = False
+            --     }
+            --   , A.TargetEntry
+            --     { A.targetexpr = A.VARPOS "OUTER_VAR" 4
+            --     , A.targetresname = "avg"
+            --     , A.resjunk = False
+            --     }
+            --   ]
+            -- , A.operator = q2Agg
+            -- , A.qual = []
+            -- , A.skewTable = "none"
+            -- , A.skewColumn = -1
+            -- }
+          }
+
+neumannQ2 :: A.PlannedStmt
+neumannQ2 = A.PlannedStmt
+            { A.planTree = q2Join3
+            , A.subplans = []
+            }
+
+--
+--------------------------------------------------------------------------------
+-- TPC-H Q21
+
+defCol :: String -> String -> A.TargetEntry
+defCol t c = A.TargetEntry
+          { A.targetexpr = A.VAR t c
+          , A.targetresname = c
+          , A.resjunk = False
+          }
+
+seqNation :: A.Operator
+seqNation = A.SEQSCAN
+            { A.targetlist =
+              [ defCol "nation" "n_nationkey"
+              , defCol "nation" "n_name"
+              , defCol "nation" "n_regionkey"
+              , defCol "nation" "n_comment"
+              ]
+            , A.qual = 
+              [ A.OPEXPR
+                { A.oprname = "="
+                , A.oprargs =
+                  [ A.VAR "nation" "n_name"
+                  , A.CONST "VIETNAM" "bpchar"
+                  ]
+                }
+              ]
+            , A.scanrelation = "nation"
+            }
+
+seqSupplier :: A.Operator
+seqSupplier = A.SEQSCAN
+              { A.targetlist =
+                [ defCol "supplier" "s_suppkey"
+                , defCol "supplier" "s_name"
+                , defCol "supplier" "s_address"
+                , defCol "supplier" "s_nationkey"
+                , defCol "supplier" "s_phone"
+                , defCol "supplier" "s_acctbal"
+                , defCol "supplier" "s_comment"
+                ]
+              , A.qual = []
+              , A.scanrelation = "supplier"
+              }
+
+tpc21j1 :: A.Operator
+tpc21j1 = A.HASHJOIN
+    { A.targetlist =
+      [ defCol "OUTER_VAR" "n_nationkey"
+      , defCol "OUTER_VAR" "n_name"
+      , defCol "OUTER_VAR" "n_regionkey"
+      , defCol "OUTER_VAR" "n_comment"
+      , defCol "INNER_VAR" "s_suppkey"
+      , defCol "INNER_VAR" "s_name"
+      , defCol "INNER_VAR" "s_address"
+      , defCol "INNER_VAR" "s_nationkey"
+      , defCol "INNER_VAR" "s_phone"
+      , defCol "INNER_VAR" "s_acctbal"
+      , defCol "INNER_VAR" "s_comment"
+      ]
+    , A.joinType = A.INNER
+    , A.inner_unique = False
+    , A.joinquals = []
+    , A.hashclauses =
+      [ A.OPEXPR
+        { A.oprname = "="
+        , A.oprargs =
+          [ A.VARPOS "OUTER_VAR" 1
+          , A.VARPOS "INNER_VAR" 4 ]
+        }
+      ]
+    , A.lefttree = seqNation
+    , A.righttree =
+      A.HASH
+      { A.targetlist =
+        [ defCol "OUTER_VAR" "s_suppkey"
+        , defCol "OUTER_VAR" "s_name"
+        , defCol "OUTER_VAR" "s_address"
+        , defCol "OUTER_VAR" "s_nationkey"
+        , defCol "OUTER_VAR" "s_phone"
+        , defCol "OUTER_VAR" "s_acctbal"
+        , defCol "OUTER_VAR" "s_comment"
+        ]
+      , A.qual = []
+      , A.operator = seqSupplier
+      , A.skewTable = "supplier"
+      , A.skewColumn = 0
+      }
+    }
+
+seqLineitem :: A.Operator
+seqLineitem = A.SEQSCAN
+              { A.targetlist =
+                [ defCol "lineitem" "l_orderkey"
+                , defCol "lineitem" "l_partkey"
+                , defCol "lineitem" "l_suppkey"
+                , defCol "lineitem" "l_linenumber"
+                , defCol "lineitem" "l_quantity"
+                , defCol "lineitem" "l_extendedprice"
+                , defCol "lineitem" "l_discount"
+                , defCol "lineitem" "l_tax"
+                , defCol "lineitem" "l_returnflag"
+                , defCol "lineitem" "l_linestatus"
+                , defCol "lineitem" "l_shipdate"
+                , defCol "lineitem" "l_commitdate"
+                , defCol "lineitem" "l_receiptdate"
+                , defCol "lineitem" "l_shipinstruct"
+                , defCol "lineitem" "l_shipmode"
+                , defCol "lineitem" "l_comment"
+                ]
+              , A.qual = []
+              , A.scanrelation = "lineitem"
+              }
+
+tpc21j2 :: A.Operator
+tpc21j2 = A.HASHJOIN
+          { A.targetlist =
+            [ defCol "OUTER_VAR" "n_nationkey"
+            , defCol "OUTER_VAR" "n_name"
+            , defCol "OUTER_VAR" "n_regionkey"
+            , defCol "OUTER_VAR" "n_comment"
+            , defCol "OUTER_VAR" "s_suppkey"
+            , defCol "OUTER_VAR" "s_name"
+            , defCol "OUTER_VAR" "s_address"
+            , defCol "OUTER_VAR" "s_nationkey"
+            , defCol "OUTER_VAR" "s_phone"
+            , defCol "OUTER_VAR" "s_acctbal"
+            , defCol "OUTER_VAR" "s_comment"
+            , defCol "INNER_VAR" "l_orderkey"
+            , defCol "INNER_VAR" "l_partkey"
+            , defCol "INNER_VAR" "l_suppkey"
+            , defCol "INNER_VAR" "l_linenumber"
+            , defCol "INNER_VAR" "l_quantity"
+            , defCol "INNER_VAR" "l_extendedprice"
+            , defCol "INNER_VAR" "l_discount"
+            , defCol "INNER_VAR" "l_tax"
+            , defCol "INNER_VAR" "l_returnflag"
+            , defCol "INNER_VAR" "l_linestatus"
+            , defCol "INNER_VAR" "l_shipdate"
+            , defCol "INNER_VAR" "l_commitdate"
+            , defCol "INNER_VAR" "l_receiptdate"
+            , defCol "INNER_VAR" "l_shipinstruct"
+            , defCol "INNER_VAR" "l_shipmode"
+            , defCol "INNER_VAR" "l_comment"
+            ]
+          , A.joinType = A.INNER
+          , A.inner_unique = False
+          , A.joinquals = []
+          , A.hashclauses =
+            [ A.OPEXPR
+              { A.oprname = "="
+              , A.oprargs =
+                [ A.VAR "OUTER_VAR" "s_suppkey"
+                , A.VAR "INNER_VAR" "l_suppkey"
+                ]
+              }
+            ]
+          , A.lefttree = tpc21j1
+          , A.righttree =
+            A.HASH
+            { A.targetlist =
+              [ defCol "OUTER_VAR" "l_orderkey"
+              , defCol "OUTER_VAR" "l_partkey"
+              , defCol "OUTER_VAR" "l_suppkey"
+              , defCol "OUTER_VAR" "l_linenumber"
+              , defCol "OUTER_VAR" "l_quantity"
+              , defCol "OUTER_VAR" "l_extendedprice"
+              , defCol "OUTER_VAR" "l_discount"
+              , defCol "OUTER_VAR" "l_tax"
+              , defCol "OUTER_VAR" "l_returnflag"
+              , defCol "OUTER_VAR" "l_linestatus"
+              , defCol "OUTER_VAR" "l_shipdate"
+              , defCol "OUTER_VAR" "l_commitdate"
+              , defCol "OUTER_VAR" "l_receiptdate"
+              , defCol "OUTER_VAR" "l_shipinstruct"
+              , defCol "OUTER_VAR" "l_shipmode"
+              , defCol "OUTER_VAR" "l_comment"
+              ]
+            , A.qual = []
+            , A.operator = seqLineitem
+                            { A.qual =
+                              [ A.OPEXPR
+                                { A.oprname = ">"
+                                , A.oprargs =
+                                  [ A.VAR "lineitem" "l_receiptdate"
+                                  , A.VAR "lineitem" "l_commitdate"
+                                  ]
+                                }
+                              ]
+                            }
+            , A.skewTable = "lineitem"
+            , A.skewColumn = 3
+            }
+          }
+
+seqOrders :: A.Operator
+seqOrders = A.SEQSCAN
+            { A.targetlist =
+              [ defCol "orders" "o_orderkey"
+              , defCol "orders" "o_custkey"
+              , defCol "orders" "o_orderstatus"
+              , defCol "orders" "o_totalprice"
+              , defCol "orders" "o_orderdate"
+              , defCol "orders" "o_orderpriority"
+              , defCol "orders" "o_clerk"
+              , defCol "orders" "o_shippriority"
+              , defCol "orders" "o_comment"
+              ]
+            , A.qual =
+              [ A.OPEXPR
+                { A.oprname = "="
+                , A.oprargs =
+                  [ A.VAR "orders" "o_orderstatus"
+                  , A.CONST "F" "bpchar"
+                  ]
+                }
+              ]
+            , A.scanrelation = "orders" }
+
+tpc21j3 :: A.Operator
+tpc21j3 = A.HASHJOIN
+          { A.targetlist =
+            [ defCol "OUTER_VAR" "n_nationkey"
+            , defCol "OUTER_VAR" "n_name"
+            , defCol "OUTER_VAR" "n_regionkey"
+            , defCol "OUTER_VAR" "n_comment"
+            , defCol "OUTER_VAR" "s_suppkey"
+            , defCol "OUTER_VAR" "s_name"
+            , defCol "OUTER_VAR" "s_address"
+            , defCol "OUTER_VAR" "s_nationkey"
+            , defCol "OUTER_VAR" "s_phone"
+            , defCol "OUTER_VAR" "s_acctbal"
+            , defCol "OUTER_VAR" "s_comment"
+            , defCol "OUTER_VAR" "l_orderkey"
+            , defCol "OUTER_VAR" "l_partkey"
+            , defCol "OUTER_VAR" "l_suppkey"
+            , defCol "OUTER_VAR" "l_linenumber"
+            , defCol "OUTER_VAR" "l_quantity"
+            , defCol "OUTER_VAR" "l_extendedprice"
+            , defCol "OUTER_VAR" "l_discount"
+            , defCol "OUTER_VAR" "l_tax"
+            , defCol "OUTER_VAR" "l_returnflag"
+            , defCol "OUTER_VAR" "l_linestatus"
+            , defCol "OUTER_VAR" "l_shipdate"
+            , defCol "OUTER_VAR" "l_commitdate"
+            , defCol "OUTER_VAR" "l_receiptdate"
+            , defCol "OUTER_VAR" "l_shipinstruct"
+            , defCol "OUTER_VAR" "l_shipmode"
+            , defCol "OUTER_VAR" "l_comment"
+            , defCol "INNER_VAR" "o_orderkey"
+            , defCol "INNER_VAR" "o_custkey"
+            , defCol "INNER_VAR" "o_orderstatus"
+            , defCol "INNER_VAR" "o_totalprice"
+            , defCol "INNER_VAR" "o_orderdate"
+            , defCol "INNER_VAR" "o_orderpriority"
+            , defCol "INNER_VAR" "o_clerk"
+            , defCol "INNER_VAR" "o_shippriority"
+            , defCol "INNER_VAR" "o_comment"
+            ]
+          , A.joinType = A.INNER
+          , A.inner_unique = False
+          , A.joinquals = []
+          , A.hashclauses =
+            [ A.OPEXPR
+              { A.oprname = "="
+              , A.oprargs =
+                [ A.VAR "OUTER_VAR" "l_orderkey"
+                , A.VAR "INNER_VAR" "o_orderkey"
+                ]
+              }
+            ]
+          , A.lefttree = tpc21j2
+          , A.righttree =
+            A.HASH
+            { A.targetlist =
+              [ defCol "OUTER_VAR" "o_orderkey"
+              , defCol "OUTER_VAR" "o_custkey"
+              , defCol "OUTER_VAR" "o_orderstatus"
+              , defCol "OUTER_VAR" "o_totalprice"
+              , defCol "OUTER_VAR" "o_orderdate"
+              , defCol "OUTER_VAR" "o_orderpriority"
+              , defCol "OUTER_VAR" "o_clerk"
+              , defCol "OUTER_VAR" "o_shippriority"
+              , defCol "OUTER_VAR" "o_comment"]
+            , A.qual = []
+            , A.operator = seqOrders
+            , A.skewTable = "orders"
+            , A.skewColumn = 0
+            }
+          }
+
+tpc21j4 :: A.Operator
+tpc21j4 = A.HASHJOIN
+          { A.targetlist =
+            [ defCol "OUTER_VAR" "n_nationkey"
+            , defCol "OUTER_VAR" "n_name"
+            , defCol "OUTER_VAR" "n_regionkey"
+            , defCol "OUTER_VAR" "n_comment"
+            , defCol "OUTER_VAR" "s_suppkey"
+            , defCol "OUTER_VAR" "s_name"
+            , defCol "OUTER_VAR" "s_address"
+            , defCol "OUTER_VAR" "s_nationkey"
+            , defCol "OUTER_VAR" "s_phone"
+            , defCol "OUTER_VAR" "s_acctbal"
+            , defCol "OUTER_VAR" "s_comment"
+            , defCol "OUTER_VAR" "l_orderkey"
+            , defCol "OUTER_VAR" "l_partkey"
+            , defCol "OUTER_VAR" "l_suppkey"
+            , defCol "OUTER_VAR" "l_linenumber"
+            , defCol "OUTER_VAR" "l_quantity"
+            , defCol "OUTER_VAR" "l_extendedprice"
+            , defCol "OUTER_VAR" "l_discount"
+            , defCol "OUTER_VAR" "l_tax"
+            , defCol "OUTER_VAR" "l_returnflag"
+            , defCol "OUTER_VAR" "l_linestatus"
+            , defCol "OUTER_VAR" "l_shipdate"
+            , defCol "OUTER_VAR" "l_commitdate"
+            , defCol "OUTER_VAR" "l_receiptdate"
+            , defCol "OUTER_VAR" "l_shipinstruct"
+            , defCol "OUTER_VAR" "l_shipmode"
+            , defCol "OUTER_VAR" "l_comment"
+            , defCol "OUTER_VAR" "o_orderkey"
+            , defCol "OUTER_VAR" "o_custkey"
+            , defCol "OUTER_VAR" "o_orderstatus"
+            , defCol "OUTER_VAR" "o_totalprice"
+            , defCol "OUTER_VAR" "o_orderdate"
+            , defCol "OUTER_VAR" "o_orderpriority"
+            , defCol "OUTER_VAR" "o_clerk"
+            , defCol "OUTER_VAR" "o_shippriority"
+            , defCol "OUTER_VAR" "o_comment"
+            ]
+          , A.joinType = A.ANTI
+          , A.inner_unique = False
+          , A.joinquals =
+            [ A.OPEXPR
+              { A.oprname = "<>"
+              , A.oprargs = 
+                [ A.VAR "OUTER_VAR" "l_suppkey"
+                , A.VAR "INNER_VAR" "l_suppkey"
+                ]
+              }
+            ]
+          , A.hashclauses =
+            [ A.OPEXPR
+              { A.oprname = "="
+              , A.oprargs =
+                [ A.VAR "OUTER_VAR" "l_orderkey"
+                , A.VAR "INNER_VAR" "l_orderkey"
+                ]
+              }
+            ]
+          , A.lefttree = tpc21j3
+          , A.righttree =
+            A.HASH
+            { A.targetlist =
+              [ defCol "OUTER_VAR" "l_orderkey"
+              , defCol "OUTER_VAR" "l_partkey"
+              , defCol "OUTER_VAR" "l_suppkey"
+              , defCol "OUTER_VAR" "l_linenumber"
+              , defCol "OUTER_VAR" "l_quantity"
+              , defCol "OUTER_VAR" "l_extendedprice"
+              , defCol "OUTER_VAR" "l_discount"
+              , defCol "OUTER_VAR" "l_tax"
+              , defCol "OUTER_VAR" "l_returnflag"
+              , defCol "OUTER_VAR" "l_linestatus"
+              , defCol "OUTER_VAR" "l_shipdate"
+              , defCol "OUTER_VAR" "l_commitdate"
+              , defCol "OUTER_VAR" "l_receiptdate"
+              , defCol "OUTER_VAR" "l_shipinstruct"
+              , defCol "OUTER_VAR" "l_shipmode"
+              , defCol "OUTER_VAR" "l_comment"
+              ]
+            , A.qual = []
+            , A.operator = seqLineitem
+                            { A.qual =
+                              [ A.OPEXPR
+                                { A.oprname = ">"
+                                , A.oprargs =
+                                  [ A.VAR "lineitem" "l_receiptdate"
+                                  , A.VAR "lineitem" "l_commitdate"
+                                  ]
+                                }
+                              ]
+                            }
+            , A.skewTable = "lineitem"
+            , A.skewColumn = 3
+            }
+          }
+
+tpc21j5 :: A.Operator
+tpc21j5 = A.HASHJOIN
+          { A.targetlist =
+            [ defCol "OUTER_VAR" "n_nationkey"
+            , defCol "OUTER_VAR" "n_name"
+            , defCol "OUTER_VAR" "n_regionkey"
+            , defCol "OUTER_VAR" "n_comment"
+            , defCol "OUTER_VAR" "s_suppkey"
+            , defCol "OUTER_VAR" "s_name"
+            , defCol "OUTER_VAR" "s_address"
+            , defCol "OUTER_VAR" "s_nationkey"
+            , defCol "OUTER_VAR" "s_phone"
+            , defCol "OUTER_VAR" "s_acctbal"
+            , defCol "OUTER_VAR" "s_comment"
+            , defCol "OUTER_VAR" "l_orderkey"
+            , defCol "OUTER_VAR" "l_partkey"
+            , defCol "OUTER_VAR" "l_suppkey"
+            , defCol "OUTER_VAR" "l_linenumber"
+            , defCol "OUTER_VAR" "l_quantity"
+            , defCol "OUTER_VAR" "l_extendedprice"
+            , defCol "OUTER_VAR" "l_discount"
+            , defCol "OUTER_VAR" "l_tax"
+            , defCol "OUTER_VAR" "l_returnflag"
+            , defCol "OUTER_VAR" "l_linestatus"
+            , defCol "OUTER_VAR" "l_shipdate"
+            , defCol "OUTER_VAR" "l_commitdate"
+            , defCol "OUTER_VAR" "l_receiptdate"
+            , defCol "OUTER_VAR" "l_shipinstruct"
+            , defCol "OUTER_VAR" "l_shipmode"
+            , defCol "OUTER_VAR" "l_comment"
+            , defCol "OUTER_VAR" "o_orderkey"
+            , defCol "OUTER_VAR" "o_custkey"
+            , defCol "OUTER_VAR" "o_orderstatus"
+            , defCol "OUTER_VAR" "o_totalprice"
+            , defCol "OUTER_VAR" "o_orderdate"
+            , defCol "OUTER_VAR" "o_orderpriority"
+            , defCol "OUTER_VAR" "o_clerk"
+            , defCol "OUTER_VAR" "o_shippriority"
+            , defCol "OUTER_VAR" "o_comment"
+            ]
+          , A.joinType = A.SEMI
+          , A.inner_unique = False
+          , A.joinquals =
+            [ A.OPEXPR
+              { A.oprname = "<>"
+              , A.oprargs = 
+                [ A.VAR "OUTER_VAR" "l_suppkey"
+                , A.VAR "INNER_VAR" "l_suppkey"
+                ]
+              }
+            -- , A.OPEXPR
+            --   { A.oprname = ">"
+            --   , A.oprargs =
+            --     [ A.VAR "INNER_VAR" "l_receiptdate"
+            --     , A.VAR "INNER_VAR" "l_commitdate"
+            --     ]
+            --   }
+            ]
+          , A.hashclauses =
+            [ A.OPEXPR
+              { A.oprname = "="
+              , A.oprargs =
+                [ A.VAR "OUTER_VAR" "l_orderkey"
+                , A.VAR "INNER_VAR" "l_orderkey"
+                ]
+              }
+            ]
+          , A.lefttree = tpc21j4
+          , A.righttree =
+            A.HASH
+            { A.targetlist =
+              [ defCol "OUTER_VAR" "l_orderkey"
+              , defCol "OUTER_VAR" "l_partkey"
+              , defCol "OUTER_VAR" "l_suppkey"
+              , defCol "OUTER_VAR" "l_linenumber"
+              , defCol "OUTER_VAR" "l_quantity"
+              , defCol "OUTER_VAR" "l_extendedprice"
+              , defCol "OUTER_VAR" "l_discount"
+              , defCol "OUTER_VAR" "l_tax"
+              , defCol "OUTER_VAR" "l_returnflag"
+              , defCol "OUTER_VAR" "l_linestatus"
+              , defCol "OUTER_VAR" "l_shipdate"
+              , defCol "OUTER_VAR" "l_commitdate"
+              , defCol "OUTER_VAR" "l_receiptdate"
+              , defCol "OUTER_VAR" "l_shipinstruct"
+              , defCol "OUTER_VAR" "l_shipmode"
+              , defCol "OUTER_VAR" "l_comment"
+              ]
+            , A.qual = []
+            , A.operator = seqLineitem
+            , A.skewTable = "lineitem"
+            , A.skewColumn = 0
+            }
+          }
+
+tpc21agg :: A.Operator
+tpc21agg = A.AGG
+          { A.targetlist =
+            [ defCol "OUTER_VAR" "s_name"
+            , A.TargetEntry
+              { A.targetexpr =
+                A.AGGREF
+                { A.aggname = "count"
+                , A.aggargs =
+                  []
+                , A.aggdirectargs = []
+                , A.aggorder = []
+                , A.aggdistinct = []
+                , A.aggfilter = Nothing
+                , A.aggstar = True }
+              , A.targetresname = "numwait"
+              , A.resjunk = False
+              }
+            ]
+          , A.operator = tpc21j5
+          , A.groupCols = [6]
+          , A.aggstrategy = A.AGG_HASHED
+          , A.aggsplit = [A.AGGSPLITOP_SIMPLE]
+          }
+
+tpc21sort :: A.Operator
+tpc21sort = A.SORT
+            { A.targetlist =
+              [ defCol "OUTER_VAR" "s_name"
+              , defCol "OUTER_VAR" "numwait"
+              ]
+            , A.operator = tpc21agg
+            , A.sortCols =
+              [ A.SortEx 2 False False
+              , A.SortEx 1 True False
+              ]
+            }
+
+tpc21limit :: A.Operator
+tpc21limit = A.LIMIT
+            { A.operator = tpc21sort
+            , A.limitOffset = Nothing
+            , A.limitCount = Just
+              (A.CONST "1" "int8")
+            }
+
+tpch21 :: A.PlannedStmt
+tpch21 = A.PlannedStmt
+          { A.planTree =
+            tpc21limit
+          , A.subplans = []
+          }
+
+--
+--------------------------------------------------------------------------------
 
 -- access list elements safely
 (!!) :: [a] -> Int -> Maybe a
@@ -1855,10 +2997,10 @@ checkAndGenerate authStr op = do
   -- Print AST structure as well as the postgres plan
   putStrLn $ PP.ppShow infered
   let pgplan = gprint infered
-  putStrLn $ "Explain: "
-  putStrLn $ "select _pq_plan_explain('" ++ pgplan ++ "', true);"
-  putStrLn $ "Execute:"
-  putStrLn $ "select _pq_plan_deserialize('" ++ pgplan ++ "');"
+  -- putStrLn $ "Explain: "
+  writeFile "explain.sql" $ "select _pq_plan_explain('" ++ pgplan ++ "', true);"
+  -- putStrLn $ "Execute:"
+  writeFile "execute.sql" $ "select _pq_plan_deserialize('" ++ pgplan ++ "');"
 
 checkAndGenerateStmt :: String -> A.PlannedStmt -> IO ()
 checkAndGenerateStmt authStr op = do
@@ -1891,10 +3033,10 @@ checkAndGenerateStmt authStr op = do
   -- Print AST structure as well as the postgres plan
   putStrLn $ PP.ppShow infered
   let pgplan = gprint infered
-  putStrLn $ "Explain: "
-  putStrLn $ "select _pq_plan_explain('" ++ pgplan ++ "', true);"
-  putStrLn $ "Execute:"
-  putStrLn $ "select _pq_plan_deserialize('" ++ pgplan ++ "');"
+  -- putStrLn $ "Explain: "
+  writeFile "explain.sql" $ "select _pq_plan_explain('" ++ pgplan ++ "', true);"
+  -- putStrLn $ "Execute:"
+  writeFile "execute.sql" $ "select _pq_plan_deserialize('" ++ pgplan ++ "');"
 
 
 main :: IO ()
@@ -1909,4 +3051,4 @@ main = do
     let authStr = forceEither $ get cp "Main" "dbauth" :: String
 
     -- checkAndGenerate authStr paragg
-    checkAndGenerateStmt authStr neumannQ1'
+    checkAndGenerateStmt authStr tpch21

@@ -220,7 +220,7 @@ extract op = let
 
 (~>) (HASH {targetlist, qual, operator, skewTable})
   = do
-    logTable skewTable
+    -- logTable skewTable
     mapM_ (~~~>) targetlist
     mapM_ (~~>) qual
     (~>) operator
