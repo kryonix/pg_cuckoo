@@ -122,6 +122,7 @@ extract op = let
 (~>) i@(INDEXSCAN {targetlist, qual, indexqual, indexname, scanrelation})
   = do
     -- logScan i
+    logTable indexname
     logTable scanrelation
     mapM_ (~~~>) targetlist
     mapM_ (~~>) qual

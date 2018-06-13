@@ -2711,6 +2711,99 @@ tpc21j3 = A.HASHJOIN
             }
           }
 
+tpc21j3Index :: A.Operator
+tpc21j3Index = A.NESTLOOP
+          { A.targetlist =
+            [ defCol "OUTER_VAR" "n_nationkey"
+            , defCol "OUTER_VAR" "n_name"
+            , defCol "OUTER_VAR" "n_regionkey"
+            , defCol "OUTER_VAR" "n_comment"
+            , defCol "OUTER_VAR" "s_suppkey"
+            , defCol "OUTER_VAR" "s_name"
+            , defCol "OUTER_VAR" "s_address"
+            , defCol "OUTER_VAR" "s_nationkey"
+            , defCol "OUTER_VAR" "s_phone"
+            , defCol "OUTER_VAR" "s_acctbal"
+            , defCol "OUTER_VAR" "s_comment"
+            , defCol "OUTER_VAR" "l_orderkey"
+            , defCol "OUTER_VAR" "l_partkey"
+            , defCol "OUTER_VAR" "l_suppkey"
+            , defCol "OUTER_VAR" "l_linenumber"
+            , defCol "OUTER_VAR" "l_quantity"
+            , defCol "OUTER_VAR" "l_extendedprice"
+            , defCol "OUTER_VAR" "l_discount"
+            , defCol "OUTER_VAR" "l_tax"
+            , defCol "OUTER_VAR" "l_returnflag"
+            , defCol "OUTER_VAR" "l_linestatus"
+            , defCol "OUTER_VAR" "l_shipdate"
+            , defCol "OUTER_VAR" "l_commitdate"
+            , defCol "OUTER_VAR" "l_receiptdate"
+            , defCol "OUTER_VAR" "l_shipinstruct"
+            , defCol "OUTER_VAR" "l_shipmode"
+            , defCol "OUTER_VAR" "l_comment"
+            , defCol "INNER_VAR" "o_orderkey"
+            , defCol "INNER_VAR" "o_custkey"
+            , defCol "INNER_VAR" "o_orderstatus"
+            , defCol "INNER_VAR" "o_totalprice"
+            , defCol "INNER_VAR" "o_orderdate"
+            , defCol "INNER_VAR" "o_orderpriority"
+            , defCol "INNER_VAR" "o_clerk"
+            , defCol "INNER_VAR" "o_shippriority"
+            , defCol "INNER_VAR" "o_comment"
+            ]
+          , A.joinType = A.INNER
+          , A.inner_unique = False
+          , A.joinquals = []
+              -- [ A.OPEXPR
+              --   { A.oprname = "="
+              --   , A.oprargs =
+              --     [ A.VAR "OUTER_VAR" "l_orderkey"
+              --     , A.VAR "INNER_VAR" "o_orderkey"
+              --     ]
+              --   }
+              -- ]
+          , A.nestParams =
+            [ A.NestLoopParam 0 (A.VAR "OUTER_VAR" "l_orderkey")]
+          , A.lefttree = tpc21j2
+          , A.righttree =
+            A.INDEXSCAN
+            { A.targetlist =
+              [ defCol "orders" "o_orderkey"
+              , defCol "orders" "o_custkey"
+              , defCol "orders" "o_orderstatus"
+              , defCol "orders" "o_totalprice"
+              , defCol "orders" "o_orderdate"
+              , defCol "orders" "o_orderpriority"
+              , defCol "orders" "o_clerk"
+              , defCol "orders" "o_shippriority"
+              , defCol "orders" "o_comment"
+              ]
+            , A.qual =
+              [ A.OPEXPR
+                { A.oprname = "="
+                , A.oprargs =
+                  [ A.VAR "orders" "o_orderstatus"
+                  , A.CONST "F" "bpchar"
+                  ]
+                }
+              ]
+            , A.indexqual =
+              [ A.OPEXPR
+                { A.oprname = "="
+                , A.oprargs =
+                  [ A.VAR "INDEX_VAR" "o_orderkey"
+                  , A.PARAM A.PARAM_EXEC 0 "int4"
+                  ]
+                }
+              ]
+            , A.indexorderby = []
+            , A.indexorderasc = True
+            , A.indexname = "o_orderkey_idx"
+            , A.scanrelation = "orders"
+            }
+          }
+
+
 tpc21j4 :: A.Operator
 tpc21j4 = A.HASHJOIN
           { A.targetlist =
@@ -2771,7 +2864,7 @@ tpc21j4 = A.HASHJOIN
                 ]
               }
             ]
-          , A.lefttree = tpc21j3
+          , A.lefttree = tpc21j3Index
           , A.righttree =
             A.HASH
             { A.targetlist =

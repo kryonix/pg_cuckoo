@@ -637,9 +637,18 @@ trOperator (I.BITMAPOR { I.bitmapplans })
 
 trOperator (I.INDEXSCAN {I.targetlist, I.qual, I.indexqual, I.indexorderby, I.indexorderasc, I.indexname, I.scanrelation})
   = do
-    targetlist' <- mapM trTargetEntry $ zip targetlist [1..]
-    qual'       <- mapM trExpr qual
-    indexqual'  <- mapM trExpr indexqual
+    context <- lift $ ask
+    tbl <- accessPgClass indexname
+
+    let fakeTable = tbl {tName = "INDEX_VAR"}
+    -- Get rid of existing fake-tables (maybe not required?)
+    let rtablesC = dropWhile (\(PgTable {tOID}) -> tOID == -1) $ rtables context
+    let context' = context {rtables=rtablesC++[fakeTable]}
+
+
+    targetlist' <- local (const context') $ mapM trTargetEntry $ zip targetlist [1..]
+    qual'       <- local (const context') $ mapM trExpr qual
+    indexqual'  <- local (const context') $ mapM trExpr indexqual
 
     let indexorderdir = if indexorderasc then 1 else -1
 
@@ -647,8 +656,6 @@ trOperator (I.INDEXSCAN {I.targetlist, I.qual, I.indexqual, I.indexorderby, I.in
     let rtable:_ = filter (\x -> tName x == scanrelation) rtables
     let (Just index) = elemIndex rtable rtables
     let index' = fromIntegral index + 1
-
-    tbl <- accessPgClass indexname
 
     return $ O.INDEXSCAN
               { O.genericPlan =
@@ -928,7 +935,7 @@ trOperator (I.NESTLOOP {I.targetlist, I.joinType, I.inner_unique, I.joinquals, I
 
     -- Get rid of existing fake-tables (maybe not required?)
     let rtablesC = dropWhile (\(PgTable {tOID}) -> tOID == -1) $ rtables context
-    let context' = context {rtables=fakeTables++rtablesC}
+    let context' = context {rtables=rtablesC++fakeTables}
 
     targetlist' <- local (const context') $ mapM trTargetEntry $ zip targetlist [1..]
     joinquals'  <- local (const context') $ mapM trExpr joinquals
@@ -941,16 +948,30 @@ trOperator (I.NESTLOOP {I.targetlist, I.joinType, I.inner_unique, I.joinquals, I
                       I.SEMI  -> 4
                       I.ANTI  -> 5
 
+    nlparams' <- local (const context') $ mapM trNestLoopParam nestParams
+
+    let paramNums = map I.paramno nestParams
+
+    let righttree'' = righttree'
+                      { O.genericPlan=
+                        (O.genericPlan righttree')
+                          { O.extParam = O.Bitmapset paramNums
+                          , O.allParam = O.Bitmapset paramNums
+                          }
+                      }
+
     return $ O.NESTLOOP
               { O.genericPlan = O.defaultPlan 
                                   { O.targetlist = O.List targetlist'
                                   , O.lefttree = Just lefttree'
-                                  , O.righttree = Just righttree'
+                                  , O.righttree = Just righttree''
+                                  -- , O.extParam = O.Bitmapset paramNums
+                                  -- , O.allParam = O.Bitmapset paramNums
                                   }
               , O.jointype = joinType'
               , O.inner_unique = O.PgBool inner_unique
               , O.joinquals = O.List joinquals'
-              , O.nestParams = O.List []
+              , O.nestParams = O.List nlparams'
               }
 
 trOperator (I.MERGEJOIN {I.targetlist, I.qual, I.joinType, I.inner_unique, I.joinquals, I.mergeclauses, I.mergeStrategies, I.lefttree, I.righttree})
@@ -1482,6 +1503,16 @@ createFakeTable name (O.List targets)
 
     return $ PgTable { tOID = -1, tName = name, tKind = "", tCols = fakeCols }
 
+trNestLoopParam :: Rule I.NestLoopParam O.NestLoopParam
+trNestLoopParam (I.NestLoopParam { I.paramno, I.paramval })
+  = do
+    paramval' <- trExpr paramval
+    incrParam 1
+    return $ O.NESTLOOPPARAM
+              { O.paramno = paramno
+              , O.paramval = paramval'
+              }
+
 trSortEx :: Rule2 [O.TARGETENTRY] I.SortEx O.SORTGROUPCLAUSE
 trSortEx targetlist (I.SortEx { I.sortTarget, I.sortASC, I.sortNullsFirst })
   = do
@@ -1593,13 +1624,17 @@ trExpr v@(I.VAR { I.varTable, I.varColumn })
                   err -> error $ "No column found: " ++ PP.ppShow v ++ "\n" ++ PP.ppShow rtables
     let tableKind = tKind rtable
     -- Calculate the index of the table in rtable of PlannedStmt
-    let (Just index) = elemIndex rtable rtables
+    let index = elemIndex rtable $ filter ((/=(-1)) . tOID) rtables
     -- Postgres enumerates these indizes from 1, so we have to increment the value
     let index' = case varTable of
                   "INNER_VAR" -> 65000
                   "OUTER_VAR" -> 65001
                   "INDEX_VAR" -> 65002
-                  _ -> if tableKind == "i" then 65002 else fromIntegral index + 1
+                  _ -> if tableKind == "i"
+                       then 65002
+                       else case index of
+                              Nothing -> error $ PP.ppShow v ++ "\n" ++ PP.ppShow rtable
+                              Just i  -> fromIntegral i + 1
 
     return $ O.VAR
               { O.varno       = index'

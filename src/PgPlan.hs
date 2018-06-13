@@ -444,7 +444,10 @@ data Plan = RESULT
             }
     deriving (Eq, Show, Generic, GPrint)
 
-data NestLoopParam = FIXME Null
+data NestLoopParam = NESTLOOPPARAM
+                      { paramno :: Integer
+                      , paramval :: Expr
+                      }
     deriving (Eq, Show, Generic, GPrint)
 
 data RangeEx = RTE
