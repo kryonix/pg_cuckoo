@@ -434,10 +434,14 @@ trOperator n@(I.SORT { I.targetlist, I.operator, I.sortCols })
     when (length targetlist' < numCols)
       $ error $ "SORT: more sortCols than targetlist entries defined."
 
-    let collations = O.PlainList $ replicate numCols 0
     let nullsFirst = O.PlainList $ map (O.PgBool . I.sortNullsFirst) sortCols
 
     opnos <- mapM (trSortEx targetlist') sortCols
+
+    let cols = map O.tleSortGroupRef opnos
+    let cols' = map (\x -> targetlist' !! fromIntegral (x-1)) cols
+    colls <- mapM (getExprCollation . O.expr) cols'
+    let collations = O.PlainList $ colls
 
     when (null opnos) $ error "no opnos found"
 
@@ -531,12 +535,16 @@ trOperator (I.MERGEAPPEND { I.targetlist, I.mergeplans, I.sortCols })
     when (length targetlist' < numCols)
       $ error $ "SORT: more sortCols than targetlist entries defined."
 
-    let collations = O.PlainList $ replicate numCols 0
     let nullsFirst = O.PlainList $ map (O.PgBool . I.sortNullsFirst) sortCols
 
     opnos <- mapM (trSortEx targetlist') sortCols
 
     when (null opnos) $ error "no opnos found"
+
+    let cols = map O.tleSortGroupRef opnos
+    let cols' = map (\x -> targetlist' !! fromIntegral (x-1)) cols
+    colls <- mapM (getExprCollation . O.expr) cols'
+    let collations = O.PlainList $ colls
 
     let sortOperators = O.PlainList $ map O.sortop opnos
     let sortColIdx    = O.PlainList $ map I.sortTarget sortCols
@@ -1004,7 +1012,7 @@ trOperator (I.MERGEJOIN {I.targetlist, I.qual, I.joinType, I.inner_unique, I.joi
     
     let mergeStrategies' = map (\x -> if I.mergeASC x then 1 else -1) mergeStrategies
     let mergeNullsFirst  = map (O.PgBool . I.mergeNullsFirst) mergeStrategies
-    let mergeCollations  = replicate (length mergeclauses) 0
+    mergeCollations      <- mapM getExprCollation mergeclauses'
     let mergeFamilies    = replicate (length mergeclauses) 0
     return $ O.MERGEJOIN
               { O.genericPlan = O.defaultPlan 
@@ -1323,12 +1331,16 @@ trOperator (I.GATHERMERGE {I.targetlist, I.operator, I.num_workers, I.rescan_par
     when (length targetlist' < numCols)
       $ error $ "SORT: more sortCols than targetlist entries defined."
 
-    let collations = O.PlainList $ replicate numCols 0
     let nullsFirst = O.PlainList $ map (O.PgBool . I.sortNullsFirst) sortCols
 
     opnos <- mapM (trSortEx targetlist') sortCols
 
     when (null opnos) $ error "no opnos found"
+
+    let cols = map O.tleSortGroupRef opnos
+    let cols' = map (\x -> targetlist' !! fromIntegral (x-1)) cols
+    colls <- mapM (getExprCollation . O.expr) cols'
+    let collations = O.PlainList $ colls
 
     let sortOperators = O.PlainList $ map O.sortop opnos
     let sortColIdx    = O.PlainList $ map I.sortTarget sortCols
@@ -1488,17 +1500,22 @@ trOperator (I.PARALLEL {I.operator})
 createFakeTable :: Rule2 String (O.List O.TARGETENTRY) PgTable
 createFakeTable name (O.List targets)
   = do
+    td <- getRTableData ()
+    let table = pg_type td
+
     fakeCols <- forM (zip targets [1..]) $
                       \x -> do
                         let (O.TARGETENTRY { O.expr=expr, O.resname }, num) = x
                         typ <- getExprType expr
+                        let row = filter (\x -> x M.! "oid" == (DB.toSql typ)) table
+                        let coll = fromSql $ head row M.! "typcollation"
                         return $ PgColumn
                                   { cAttname      = maybe "" id resname
                                   , cAtttypid     = typ
                                   , cAttlen       = 0
                                   , cAttnum       = num
                                   , cAtttypmod    = -1
-                                  , cAttcollation = 0
+                                  , cAttcollation = coll
                                   }
 
     return $ PgTable { tOID = -1, tName = name, tKind = "", tCols = fakeCols }
