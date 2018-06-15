@@ -1799,9 +1799,9 @@ trExpr n@(I.OPEXPR { I.oprname, I.oprargs })
     -- No operator matching the argument types or operator name exists.
     when (null row)
       $ error $ "OPEXPR error: operator '"
-                ++ oprname
+                ++ oprname ++ " :: " ++ show oprleft ++ " × " ++ show oprright
                 ++ "' for given arguments does not exist!"
-                ++ " Check types of arguments."
+                ++ " Check types of arguments. "
                 ++ "\n" ++ PP.ppShow n
     
     let oprcode = fromSql $ head row M.! "oprcode"
