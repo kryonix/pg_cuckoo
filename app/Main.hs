@@ -2064,46 +2064,14 @@ seqStudentsFilter = seqStudents
 
 q2Join1 = A.HASHJOIN
           { A.targetlist =
-            [ A.TargetEntry
-              { A.targetexpr = A.VARPOS "OUTER_VAR" 2
-              , A.targetresname = "name"
-              , A.resjunk = False
-              }
-            , A.TargetEntry
-              { A.targetexpr = A.VARPOS "OUTER_VAR" 1
-              , A.targetresname = "id"
-              , A.resjunk = False
-              }
-            , A.TargetEntry
-              { A.targetexpr = A.VARPOS "OUTER_VAR" 3
-              , A.targetresname = "major"
-              , A.resjunk = False
-              }
-            , A.TargetEntry
-              { A.targetexpr = A.VARPOS "OUTER_VAR" 4
-              , A.targetresname = "year"
-              , A.resjunk = False
-              }
-            , A.TargetEntry
-              { A.targetexpr = A.VARPOS "INNER_VAR" 2
-              , A.targetresname = "course"
-              , A.resjunk = False
-              }
-            , A.TargetEntry
-              { A.targetexpr = A.VARPOS "INNER_VAR" 3
-              , A.targetresname = "curriculum"
-              , A.resjunk = False
-              }
-            , A.TargetEntry
-              { A.targetexpr = A.VARPOS "INNER_VAR" 4
-              , A.targetresname = "date"
-              , A.resjunk = False
-              }
-            , A.TargetEntry
-              { A.targetexpr = A.VARPOS "INNER_VAR" 5
-              , A.targetresname = "grade"
-              , A.resjunk = False
-              }
+            [ defCol "OUTER_VAR" "name"
+            , defCol "OUTER_VAR" "id"
+            , defCol "OUTER_VAR" "major"
+            , defCol "OUTER_VAR" "year"
+            , defCol "INNER_VAR" "course"
+            , defCol "INNER_VAR" "curriculum"
+            , defCol "INNER_VAR" "date"
+            , defCol "INNER_VAR" "grade"
             ]
           , A.joinType = A.INNER
           , A.inner_unique = False
@@ -2121,31 +2089,11 @@ q2Join1 = A.HASHJOIN
           , A.righttree =
             A.HASH
             { A.targetlist =
-              [ A.TargetEntry
-                { A.targetexpr = A.VARPOS "exams" 1
-                , A.targetresname = "sid"
-                , A.resjunk = False
-                }
-              , A.TargetEntry
-                { A.targetexpr = A.VARPOS "exams" 2
-                , A.targetresname = "course"
-                , A.resjunk = False
-                }
-              , A.TargetEntry
-                { A.targetexpr = A.VARPOS "exams" 3
-                , A.targetresname = "curriculum"
-                , A.resjunk = False
-                }
-              , A.TargetEntry
-                { A.targetexpr = A.VARPOS "exams" 4
-                , A.targetresname = "date"
-                , A.resjunk = False
-                }
-              , A.TargetEntry
-                { A.targetexpr = A.VARPOS "exams" 5
-                , A.targetresname = "grade"
-                , A.resjunk = False
-                }
+              [ defCol "exams" "sid"
+              , defCol "exams" "course"
+              , defCol "exams" "curriculum"
+              , defCol "exams" "date"
+              , defCol "exams" "grade"
               ]
             , A.qual = []
             , A.operator =
@@ -2157,41 +2105,13 @@ q2Join1 = A.HASHJOIN
 
 q2Join2 = A.HASHJOIN
           { A.targetlist =
-            [ A.TargetEntry
-              { A.targetexpr = A.VARPOS "OUTER_VAR" 2
-              , A.targetresname = "id"
-              , A.resjunk = False
-              }
-            , A.TargetEntry
-              { A.targetexpr = A.VARPOS "OUTER_VAR" 4
-              , A.targetresname = "year"
-              , A.resjunk = False
-              }
-            , A.TargetEntry
-              { A.targetexpr = A.VARPOS "OUTER_VAR" 3
-              , A.targetresname = "major"
-              , A.resjunk = False
-              }
-            , A.TargetEntry
-              { A.targetexpr = A.VARPOS "INNER_VAR" 2
-              , A.targetresname = "course"
-              , A.resjunk = False
-              }
-            , A.TargetEntry
-              { A.targetexpr = A.VARPOS "INNER_VAR" 3
-              , A.targetresname = "curriculum"
-              , A.resjunk = False
-              }
-            , A.TargetEntry
-              { A.targetexpr = A.VARPOS "INNER_VAR" 4
-              , A.targetresname = "date"
-              , A.resjunk = False
-              }
-            , A.TargetEntry
-              { A.targetexpr = A.VARPOS "INNER_VAR" 5
-              , A.targetresname = "grade"
-              , A.resjunk = False
-              }
+            [ defCol "OUTER_VAR" "id"
+            , defCol "OUTER_VAR" "year"
+            , defCol "OUTER_VAR" "major"
+            , defCol "INNER_VAR" "course"
+            , defCol "INNER_VAR" "curriculum"
+            , defCol "INNER_VAR" "date"
+            , defCol "INNER_VAR" "grade"
             ]
           , A.joinType = A.INNER
           , A.inner_unique = False
@@ -2239,31 +2159,11 @@ q2Join2 = A.HASHJOIN
           , A.righttree =
             A.HASH
             { A.targetlist =
-              [ A.TargetEntry
-                { A.targetexpr = A.VARPOS "exams" 1
-                , A.targetresname = "sid"
-                , A.resjunk = False
-                }
-              , A.TargetEntry
-                { A.targetexpr = A.VARPOS "exams" 2
-                , A.targetresname = "course"
-                , A.resjunk = False
-                }
-              , A.TargetEntry
-                { A.targetexpr = A.VARPOS "exams" 3
-                , A.targetresname = "curriculum"
-                , A.resjunk = False
-                }
-              , A.TargetEntry
-                { A.targetexpr = A.VARPOS "exams" 4
-                , A.targetresname = "date"
-                , A.resjunk = False
-                }
-              , A.TargetEntry
-                { A.targetexpr = A.VARPOS "exams" 5
-                , A.targetresname = "grade"
-                , A.resjunk = False
-                }
+              [ defCol "exams" "sid"
+              , defCol "exams" "course"
+              , defCol "exams" "curriculum"
+              , defCol "exams" "date"
+              , defCol "exams" "grade"
               ]
             , A.qual = []
             , A.operator =
@@ -2275,31 +2175,15 @@ q2Join2 = A.HASHJOIN
 
 q2Agg = A.AGG
         { A.targetlist =
-          [ A.TargetEntry
-            { A.targetexpr = A.VARPOS "OUTER_VAR" 1
-            , A.targetresname = "id"
-            , A.resjunk = False
-            }
-          , A.TargetEntry
-            { A.targetexpr = A.VARPOS "OUTER_VAR" 2
-            , A.targetresname = "year"
-            , A.resjunk = False
-            }
-          , A.TargetEntry
-            { A.targetexpr = A.VARPOS "OUTER_VAR" 3
-            , A.targetresname = "major"
-            , A.resjunk = False
-            }
+          [ defCol "OUTER_VAR" "id"
+          , defCol "OUTER_VAR" "year"
+          , defCol "OUTER_VAR" "major"
           , A.TargetEntry
             { A.targetexpr =
               A.AGGREF
               { A.aggname = "avg"
               , A.aggargs =
-                [ A.TargetEntry
-                  { A.targetexpr = A.VARPOS "OUTER_VAR" 7
-                  , A.targetresname = "grade"
-                  , A.resjunk = False
-                  }
+                [ defCol "OUTER_VAR" "grade"
                 ]
               , A.aggdirectargs = []
               , A.aggorder = []
@@ -2319,21 +2203,13 @@ q2Agg = A.AGG
 
 q2Join3 = A.NESTLOOP
           { A.targetlist =
-            [ A.TargetEntry
-              { A.targetexpr = A.VARPOS "OUTER_VAR" 1
-              , A.targetresname = "name"
-              , A.resjunk = False
-              }
-            , A.TargetEntry
-              { A.targetexpr = A.VARPOS "OUTER_VAR" 5
-              , A.targetresname = "course"
-              , A.resjunk = False
-              }
+            [ defCol "OUTER_VAR" "name"
+            , defCol "OUTER_VAR" "course"
             ]
           , A.joinType = A.INNER
           , A.inner_unique = False
           , A.joinquals =
-            [ {-A.OPEXPR
+            [ A.OPEXPR
               { A.oprname = ">"
               , A.oprargs =
                 [ A.FUNCEXPR
@@ -2377,7 +2253,7 @@ q2Join3 = A.NESTLOOP
                     ]
                   }
                 ]
-              }-}
+              }
             ]
           , A.nestParams =
             []
@@ -3144,4 +3020,4 @@ main = do
     let authStr = forceEither $ get cp "Main" "dbauth" :: String
 
     -- checkAndGenerate authStr paragg
-    checkAndGenerateStmt authStr tpch21
+    checkAndGenerateStmt authStr neumannQ2
