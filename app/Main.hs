@@ -1894,6 +1894,11 @@ j1 = A.HASHJOIN
           , A.targetresname = "course"
           , A.resjunk = False
           }
+        , A.TargetEntry
+          { A.targetexpr = A.VARPOS "INNER_VAR" 5
+          , A.targetresname = "grade"
+          , A.resjunk = False
+          }
         ]
       , A.joinType = A.INNER
       , A.inner_unique = False
@@ -2002,7 +2007,15 @@ neumannQ1'' = A.PlannedStmt
                   ]
                 , A.joinType = A.INNER
                 , A.inner_unique = False
-                , A.joinquals = []
+                , A.joinquals =
+                  [ A.OPEXPR
+                    { A.oprname = "="
+                    , A.oprargs =
+                      [ A.VARPOS "OUTER_VAR" 4
+                      , A.VARPOS "INNER_VAR" 2
+                      ]
+                    }
+                  ]
                 , A.hashclauses =
                   [ A.OPEXPR
                     { A.oprname = "="
@@ -3020,4 +3033,4 @@ main = do
     let authStr = forceEither $ get cp "Main" "dbauth" :: String
 
     -- checkAndGenerate authStr paragg
-    checkAndGenerateStmt authStr neumannQ2
+    checkAndGenerateStmt authStr neumannQ1''
