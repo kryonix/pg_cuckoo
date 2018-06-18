@@ -2165,11 +2165,11 @@ q2Join2 = A.HASHJOIN
           , A.righttree =
             A.HASH
             { A.targetlist =
-              [ defCol "exams" "sid"
-              , defCol "exams" "course"
-              , defCol "exams" "curriculum"
-              , defCol "exams" "date"
-              , defCol "exams" "grade"
+              [ defCol "OUTER_VAR" "sid"
+              , defCol "OUTER_VAR" "course"
+              , defCol "OUTER_VAR" "curriculum"
+              , defCol "OUTER_VAR" "date"
+              , defCol "OUTER_VAR" "grade"
               ]
             , A.operator =
               seqExams
@@ -2263,7 +2263,7 @@ q2Join3 = A.NESTLOOP
           , A.nestParams =
             []
           , A.lefttree = q2Join1
-          , A.righttree = q2Agg
+          , A.righttree = A.MATERIAL q2Agg
             -- A.HASH
             -- { A.targetlist =
             --   [ A.TargetEntry
