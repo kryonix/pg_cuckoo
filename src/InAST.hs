@@ -199,7 +199,6 @@ data Operator = SEQSCAN
                 }
               | HASH
                 { targetlist :: [TargetEntry]
-                , qual       :: [Expr]
                 , operator   :: Operator
                 , skewTable  :: String
                 , skewColumn :: Integer

@@ -278,11 +278,10 @@ validateExpr op = let
     (~>) operator
 
 
-(~>) (HASH {targetlist, qual, operator, skewTable})
+(~>) (HASH {targetlist, operator, skewTable})
   = do
     when (null skewTable)
       $ logError "HASH: no skewTable specified"
-    mapM_ (~~>) qual
     mapM_ (~~~>) targetlist
     (~>) operator
 

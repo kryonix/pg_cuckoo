@@ -607,7 +607,6 @@ hashjoin1 = A.HASHJOIN
                   , A.resjunk = False
                   }
                 ]
-              , A.qual = []
               , A.operator =
                 A.AGG
                 { A.targetlist =
@@ -1501,7 +1500,6 @@ neumannQ1 = A.PlannedStmt
                     , A.resjunk = False
                     }
                   ]
-                , A.qual = []
                 , A.operator =
                   A.SEQSCAN
                   { A.targetlist =
@@ -1657,7 +1655,6 @@ neumannQ1' = A.PlannedStmt
                       , A.resjunk = False
                       }
                     ]
-                  , A.qual = []
                   , A.operator =
                     A.HASHJOIN
                     { A.targetlist =
@@ -1780,7 +1777,6 @@ neumannQ1' = A.PlannedStmt
                           , A.resjunk = False
                           }
                         ]
-                      , A.qual = []
                       , A.operator =
                         A.SEQSCAN
                         { A.targetlist =
@@ -1942,7 +1938,6 @@ j1 = A.HASHJOIN
             , A.resjunk = False
             }
           ]
-        , A.qual = []
         , A.operator = seqExams
         , A.skewTable = "exams"
         , A.skewColumn = 0
@@ -2040,7 +2035,6 @@ neumannQ1'' = A.PlannedStmt
                       , A.resjunk = False
                       }
                     ]
-                  , A.qual = []
                   , A.operator = s1
                   , A.skewTable = "exams"
                   , A.skewColumn = 0
@@ -2108,7 +2102,6 @@ q2Join1 = A.HASHJOIN
               , defCol "exams" "date"
               , defCol "exams" "grade"
               ]
-            , A.qual = []
             , A.operator =
               seqExams
             , A.skewTable = "exams"
@@ -2178,7 +2171,6 @@ q2Join2 = A.HASHJOIN
               , defCol "exams" "date"
               , defCol "exams" "grade"
               ]
-            , A.qual = []
             , A.operator =
               seqExams
             , A.skewTable = "exams"
@@ -2392,7 +2384,6 @@ tpc21j1 = A.HASHJOIN
         , defCol "OUTER_VAR" "s_acctbal"
         , defCol "OUTER_VAR" "s_comment"
         ]
-      , A.qual = []
       , A.operator = seqSupplier
       , A.skewTable = "supplier"
       , A.skewColumn = 0
@@ -2487,7 +2478,6 @@ tpc21j2 = A.HASHJOIN
               , defCol "OUTER_VAR" "l_shipmode"
               , defCol "OUTER_VAR" "l_comment"
               ]
-            , A.qual = []
             , A.operator = seqLineitem
                             { A.qual =
                               [ A.OPEXPR
@@ -2593,7 +2583,6 @@ tpc21j3 = A.HASHJOIN
               , defCol "OUTER_VAR" "o_clerk"
               , defCol "OUTER_VAR" "o_shippriority"
               , defCol "OUTER_VAR" "o_comment"]
-            , A.qual = []
             , A.operator = seqOrders
             , A.skewTable = "orders"
             , A.skewColumn = 0
@@ -2774,7 +2763,6 @@ tpc21j4 = A.HASHJOIN
               , defCol "OUTER_VAR" "l_shipmode"
               , defCol "OUTER_VAR" "l_comment"
               ]
-            , A.qual = []
             , A.operator = seqLineitem
                             { A.qual =
                               [ A.OPEXPR
@@ -2879,7 +2867,6 @@ tpc21j5 = A.HASHJOIN
               , defCol "OUTER_VAR" "l_shipmode"
               , defCol "OUTER_VAR" "l_comment"
               ]
-            , A.qual = []
             , A.operator = seqLineitem
             , A.skewTable = "lineitem"
             , A.skewColumn = 0

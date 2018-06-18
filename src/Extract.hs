@@ -219,11 +219,10 @@ extract op = let
     mapM_ (~~~>) targetlist
     (~>) operator
 
-(~>) (HASH {targetlist, qual, operator, skewTable})
+(~>) (HASH {targetlist, operator, skewTable})
   = do
     -- logTable skewTable
     mapM_ (~~~>) targetlist
-    mapM_ (~~>) qual
     (~>) operator
 
 (~>) (HASHJOIN {targetlist, joinquals, hashclauses, lefttree, righttree})

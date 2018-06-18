@@ -1360,7 +1360,7 @@ trOperator (I.GATHERMERGE {I.targetlist, I.operator, I.num_workers, I.rescan_par
               , O.nullsFirst    = nullsFirst
               }
 
-trOperator s@(I.HASH {I.targetlist, I.qual, I.operator, I.skewTable, I.skewColumn})
+trOperator s@(I.HASH {I.targetlist, I.operator, I.skewTable, I.skewColumn})
   = do
     context <- lift $ ask
     --rtables <- getRTables ()
@@ -1377,8 +1377,6 @@ trOperator s@(I.HASH {I.targetlist, I.qual, I.operator, I.skewTable, I.skewColum
 
     targetlist' <- local (const context') $ mapM trTargetEntry $ zip targetlist [1..]
 
-    qual' <- local (const context') $ mapM trExpr qual
-
     let rtable:_ = filter (\x -> tName x == skewTable) rtablesC
     let oid = case skewTable of
                 "none" -> -1
@@ -1387,7 +1385,6 @@ trOperator s@(I.HASH {I.targetlist, I.qual, I.operator, I.skewTable, I.skewColum
     return $ O.HASH
               { O.genericPlan = O.defaultPlan
                                 { O.targetlist = O.List targetlist'
-                                , O.qual       = O.List qual'
                                 , O.lefttree   = Just operator'
                                 }
               , O.skewTable = oid
