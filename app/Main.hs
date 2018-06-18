@@ -2223,7 +2223,7 @@ q2Join3 = A.NESTLOOP
           , A.inner_unique = False
           , A.joinquals =
             [ A.OPEXPR
-              { A.oprname = ">"
+              { A.oprname = ">="
               , A.oprargs =
                 [ A.FUNCEXPR
                   { A.funcname = "numeric"
@@ -3033,4 +3033,4 @@ main = do
     let authStr = forceEither $ get cp "Main" "dbauth" :: String
 
     -- checkAndGenerate authStr paragg
-    checkAndGenerateStmt authStr neumannQ1''
+    checkAndGenerateStmt authStr neumannQ2
