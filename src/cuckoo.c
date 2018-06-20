@@ -103,6 +103,7 @@ PlannedStmt *sr_planner(Query *parse,
             int cursorOptions,
             ParamListInfo boundParams)
 {
+  planner_hook=NULL;
   return myEvilPlan;
 }
 
@@ -130,7 +131,7 @@ pq_plan_serialize(PG_FUNCTION_ARGS)
   querytree = pg_analyze_and_rewrite(parsetree, query_string, NULL, 0, NULL);
   
   querytree = pg_plan_queries(querytree, CURSOR_OPT_PARALLEL_OK, NULL);
-  out = format_node((Node*) querytree, pretty);
+  out = format_node((Node*) (linitial(querytree)), pretty);
     // out = format_node((Node *) querytree, pretty);
 
   // out = format_node((Node *) (parsetree->stmt), pretty);
