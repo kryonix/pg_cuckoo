@@ -45,6 +45,7 @@ data Value = NoValue
            | Int Integer
            | Bool Bool
            | Str String
+           | Dbl Double
            | VChunk Chunk
            | Sequence [Integer]
            | List [Value]
@@ -77,7 +78,7 @@ type Parser = Parsec Void String
 parseLog :: String -> [Chunk]
 parseLog str =
     case parse program "" str of
-        Left e  -> error $ parseErrorPretty e
+        Left e  -> error $ parseErrorPretty' str e
         Right r -> r
 
 
@@ -110,7 +111,8 @@ tag = do
 
 value :: Parser Value
 value = do
-    res <- integerV
+    res <- (try dblV
+        <|> integerV)
         <|> boolean
         <|> str
         <|> unit
@@ -155,6 +157,10 @@ str = do
                         return f
     return $ Str res
 
+dblV :: Parser Value
+dblV = do
+    res <- lexeme L.float
+    return $ Dbl res
 
 integerV :: Parser Value
 integerV = do
