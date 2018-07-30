@@ -22,6 +22,8 @@ import Data.Void
 import Data.Map as M
 import Data.List (intercalate)
 
+import qualified Data.List.NonEmpty as E
+
 -- The postgres internal function stringToNode is ordering-sensitive.
 -- That's why we need to preserve the order of fields.
 -- On the other hand we want to keep the Data.Map data-type.
@@ -78,6 +80,7 @@ type Parser = Parsec Void String
 parseLog :: String -> [Chunk]
 parseLog str =
     case parse program "" str of
+        -- Left e  -> error $ parseErrorPretty' (Prelude.drop ((unPos $ sourceColumn $ E.head $ errorPos e)-30) str) e
         Left e  -> error $ parseErrorPretty' str e
         Right r -> r
 
@@ -105,7 +108,7 @@ tag = do
     _ <- tColon
     -- below: parse until first space; thereafter, remove all whitespaces
     s <- (manyTill L.charLiteral spaceChar) <* sc
-    v <- value
+    v <- value <|> (return NoValue)
     return $ (s, v)
 
 
