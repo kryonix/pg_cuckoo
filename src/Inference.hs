@@ -397,17 +397,17 @@ trOperator n@(I.LIMIT { I.operator, I.limitOffset, I.limitCount })
              then getExprType (fromJust limitOffset')
              else return 0
 
-    lType <- if isJust limitOffset'
-             then getExprType (fromJust limitOffset')
+    lType <- if isJust limitCount'
+             then getExprType (fromJust limitCount')
              else return 0
 
     when (isJust limitOffset' && oType /= 20)
       $ error $ "Type error: limitOffset is not an int8"
               ++ "\n" ++ PP.ppShow n
 
-    -- when (isJust limitCount' && lType /= 20)
-    --   $ error $ "Type error: limitCount is not an int8"
-    --           ++ "\n" ++ PP.ppShow n
+    when (isJust limitCount' && lType /= 20)
+      $ error $ "Type error: limitCount is not an int8"
+              ++ "\n" ++ PP.ppShow n
 
     return $ O.LIMIT (O.defaultPlan { O.targetlist=O.targetlist (O.genericPlan operator')
                                     , O.lefttree=Just operator' }) limitOffset' limitCount'
