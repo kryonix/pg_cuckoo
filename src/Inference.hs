@@ -175,14 +175,14 @@ trPlannedStmt (I.PlannedStmt op subplan) tbls valuesScan = do
   -- otherwise postgres crashes.
   params <- fetchParamCnt ()
 
-  parellelMode <- fetchParallelMode ()
+  parallelMode <- fetchParallelMode ()
 
   return $ O.defaultPlannedStmt 
             { O.planTree = res
             , O.rtable=rtable
             , O.subplans= O.List subplan''
             , O.nParamExec = params
-            , O.parallelModeNeeded = O.PgBool parellelMode
+            , O.parallelModeNeeded = O.PgBool parallelMode
             }
 
 pgTableToRTE :: PgTable -> O.RangeEx
