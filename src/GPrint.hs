@@ -19,6 +19,7 @@ module GPrint ( GPrint(..)
 
 import GHC.Generics
 import Data.List
+import Data.String.Utils
 
 -- | Implementation of a generic record printer
 -- With these classes and instances we just have to define
@@ -45,7 +46,7 @@ instance (GPrint a) => GPrint (Maybe a) where
   gprint (Just x) = gprint x
 
 instance {-# OVERLAPS #-} GPrint String where
-  gprint x = x
+  gprint x = replace " " "\\ " x
 
 instance GPrint Integer where
   gprint x = show x

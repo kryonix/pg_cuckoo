@@ -114,7 +114,7 @@ instance GPrint Seq where
 
 instance GPrint Alias where
   gprint (Alias {aliasname=aliasname, colnames=List colnames})
-    = "{ALIAS :aliasname " ++ aliasname ++ " :colnames (" ++ intercalate " " (map show colnames) ++ ")}"
+    = "{ALIAS :aliasname " ++ gprint aliasname ++ " :colnames (" ++ intercalate " " (map show colnames) ++ ")}"
 
 -- / GPrint instances for base types
 --------------------------------------------------------------------------------
