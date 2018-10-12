@@ -39,7 +39,7 @@ pattern Chunk _chunkName _fields = ChunkOrdering { _chunkName=_chunkName
                                                  }
 
 data Chunk = ChunkOrdering {_chunkName :: String, _fields :: Fields, _orderedFields :: [(String, Value)]}
-    deriving (Show)
+    -- deriving (Show)
 
 type Fields = Map String Value
 
@@ -52,30 +52,31 @@ data Value = NoValue
            | Sequence [Integer]
            | List [Value]
            | Extra Value Value
-    deriving (Show)
+    -- deriving (Show)
 
 type Parser = Parsec Void String
 
--- instance Show Chunk where
---     show (ChunkOrdering name _ fields) = "{" ++ name ++ " " ++ intercalate " " flds ++ "}"
---         where
---             flds = [":" ++ k ++ " " ++ show v | (k, v) <- fields]
---             -- flds = [":" ++ k ++ " " ++ show v | (k, v) <- M.toList fields]
+instance Show Chunk where
+    show (ChunkOrdering name _ fields) = "{" ++ name ++ " " ++ intercalate " " flds ++ "}"
+        where
+            flds = [":" ++ k ++ " " ++ show v | (k, v) <- fields]
+            -- flds = [":" ++ k ++ " " ++ show v | (k, v) <- M.toList fields]
 
--- instance Show Value where
---     show NoValue = "<>"
---     show (Int i) = show i
---     show (Bool True) = "true"
---     show (Bool False) = "false"
---     show (Str s) = s
---     show (VChunk c) = show c
---     show (Sequence c) = "[ " ++ lst ++ " ]"
---         where
---             lst = intercalate " " $ Prelude.map show c
---     show (List l) = "(" ++ lst ++ ")"
---         where
---             lst = intercalate " " $ Prelude.map show l
---     show (Extra v1 v2) = show v1 ++ " " ++ show v2
+instance Show Value where
+    show NoValue = "<>"
+    show (Int i) = show i
+    show (Dbl d) = show d
+    show (Bool True) = "true"
+    show (Bool False) = "false"
+    show (Str s) = s
+    show (VChunk c) = show c
+    show (Sequence c) = "[ " ++ lst ++ " ]"
+        where
+            lst = intercalate " " $ Prelude.map show c
+    show (List l) = "(" ++ lst ++ ")"
+        where
+            lst = intercalate " " $ Prelude.map show l
+    show (Extra v1 v2) = show v1 ++ " " ++ show v2
 
 parseLog :: String -> [Chunk]
 parseLog str =
