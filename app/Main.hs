@@ -280,6 +280,7 @@ agg1 = A.AGG
                 , A.resjunk = False
                 }
             ]
+        , A.qual = []
         , A.operator =
             A.RESULT
               { A.targetlist = []
@@ -318,6 +319,7 @@ agg2 = A.AGG
                 , A.resjunk = False
                 }
             ]
+        , A.qual = []
         , A.operator =
             A.SEQSCAN
               { A.targetlist =
@@ -616,6 +618,7 @@ hashjoin1 = A.HASHJOIN
                     , A.resjunk = False
                     }
                   ]
+                , A.qual = []
                 , A.operator =
                   A.SEQSCAN
                   { A.targetlist =
@@ -1275,6 +1278,7 @@ paragg = A.AGG
             , A.resjunk = False
             }
           ]
+        , A.qual = []
         , A.operator =
           A.GATHER
           { A.targetlist =
@@ -1308,6 +1312,7 @@ paragg = A.AGG
                 , A.resjunk = False
                 }
               ]
+            , A.qual = []
             , A.operator =
               A.PARALLEL A.SEQSCAN
               { A.targetlist =
@@ -1550,6 +1555,7 @@ neumannQ1 = A.PlannedStmt
                     , A.resjunk = False
                     }
                   ]
+                , A.qual = []
                 , A.operator =
                   A.SEQSCAN
                   { A.targetlist =
@@ -1722,6 +1728,7 @@ neumannQ1' = A.PlannedStmt
                           , A.targetresname = "min"
                           , A.resjunk = False }
                         ]
+                      , A.qual = []
                       , A.operator =
                         A.SEQSCAN
                         { A.targetlist =
@@ -1973,6 +1980,7 @@ s1 = A.AGG
           , A.resjunk = False
           }
         ]
+      , A.qual = []
       , A.operator = seqExams
       , A.groupCols = [1]
       , A.aggstrategy = A.AGG_HASHED
@@ -2200,6 +2208,7 @@ q2Agg = A.AGG
             , A.resjunk = False
             }
           ]
+        , A.qual = []
         , A.operator = q2Join2
         , A.groupCols = [1, 2, 3]
         , A.aggstrategy = A.AGG_HASHED
@@ -2892,6 +2901,7 @@ tpc21agg = A.AGG
               , A.resjunk = False
               }
             ]
+          , A.qual = []
           , A.operator = tpc21j5
           , A.groupCols = [6]
           , A.aggstrategy = A.AGG_HASHED
@@ -2928,6 +2938,343 @@ tpch21 = A.PlannedStmt
 
 --
 --------------------------------------------------------------------------------
+-- Plan Stitching SIGMOD Query
+
+seqOrdersSIG :: A.Operator
+seqOrdersSIG = A.SEQSCAN
+            { A.targetlist =
+              [ defCol "orders" "o_orderkey"
+              , defCol "orders" "o_custkey"
+              , defCol "orders" "o_orderstatus"
+              , defCol "orders" "o_totalprice"
+              , defCol "orders" "o_orderdate"
+              , defCol "orders" "o_orderpriority"
+              , defCol "orders" "o_clerk"
+              , defCol "orders" "o_shippriority"
+              , defCol "orders" "o_comment"
+              ]
+            , A.qual =
+              [ A.OPEXPR
+                { A.oprname = ">"
+                , A.oprargs =
+                  [ A.VAR "orders" "o_orderdate"
+                  , A.CONST "1998-01-01" "date"
+                  ]
+                }
+              ]
+            , A.scanrelation = "orders" }
+
+seqLineitemSIG :: A.Operator
+seqLineitemSIG = A.SEQSCAN
+              { A.targetlist =
+                [ defCol "lineitem" "l_orderkey"
+                , defCol "lineitem" "l_partkey"
+                , defCol "lineitem" "l_suppkey"
+                , defCol "lineitem" "l_linenumber"
+                , defCol "lineitem" "l_quantity"
+                , defCol "lineitem" "l_extendedprice"
+                , defCol "lineitem" "l_discount"
+                , defCol "lineitem" "l_tax"
+                , defCol "lineitem" "l_returnflag"
+                , defCol "lineitem" "l_linestatus"
+                , defCol "lineitem" "l_shipdate"
+                , defCol "lineitem" "l_commitdate"
+                , defCol "lineitem" "l_receiptdate"
+                , defCol "lineitem" "l_shipinstruct"
+                , defCol "lineitem" "l_shipmode"
+                , defCol "lineitem" "l_comment"
+                ]
+              , A.qual = []
+              , A.scanrelation = "lineitem"
+              }
+
+seqCustomerSIG :: A.Operator
+seqCustomerSIG = A.SEQSCAN
+              { A.targetlist =
+                [ defCol "customer" "c_custkey"
+                , defCol "customer" "c_name" ]
+              , A.qual = []
+              , A.scanrelation = "customer"
+              }
+
+hashJoin_Line_Orders :: A.Operator
+hashJoin_Line_Orders
+  = A.HASHJOIN
+    { A.targetlist =
+      [ defCol "OUTER_VAR" "l_orderkey"
+      , defCol "OUTER_VAR" "l_partkey"
+      , defCol "OUTER_VAR" "l_suppkey"
+      , defCol "OUTER_VAR" "l_linenumber"
+      , defCol "OUTER_VAR" "l_quantity"
+      , defCol "OUTER_VAR" "l_extendedprice"
+      , defCol "OUTER_VAR" "l_discount"
+      , defCol "OUTER_VAR" "l_tax"
+      , defCol "OUTER_VAR" "l_returnflag"
+      , defCol "OUTER_VAR" "l_linestatus"
+      , defCol "OUTER_VAR" "l_shipdate"
+      , defCol "OUTER_VAR" "l_commitdate"
+      , defCol "OUTER_VAR" "l_receiptdate"
+      , defCol "OUTER_VAR" "l_shipinstruct"
+      , defCol "OUTER_VAR" "l_shipmode"
+      , defCol "OUTER_VAR" "l_comment"
+      , defCol "INNER_VAR" "o_orderkey"
+      , defCol "INNER_VAR" "o_custkey"
+      , defCol "INNER_VAR" "o_orderstatus"
+      , defCol "INNER_VAR" "o_totalprice"
+      , defCol "INNER_VAR" "o_orderdate"
+      , defCol "INNER_VAR" "o_orderpriority"
+      , defCol "INNER_VAR" "o_clerk"
+      , defCol "INNER_VAR" "o_shippriority"
+      , defCol "INNER_VAR" "o_comment" ]
+    , A.joinType = A.INNER
+    , A.inner_unique = False
+    , A.joinquals = []
+    , A.hashclauses =
+      [ A.OPEXPR
+        { A.oprname = "="
+        , A.oprargs =
+          [ A.VAR "OUTER_VAR" "l_orderkey"
+          , A.VAR "INNER_VAR" "o_orderkey"
+          ]
+        }
+      ]
+    , A.lefttree = seqLineitemSIG
+    , A.righttree =
+      A.HASH
+      { A.targetlist =
+        [ defCol "OUTER_VAR" "o_orderkey"
+        , defCol "OUTER_VAR" "o_custkey"
+        , defCol "OUTER_VAR" "o_orderstatus"
+        , defCol "OUTER_VAR" "o_totalprice"
+        , defCol "OUTER_VAR" "o_orderdate"
+        , defCol "OUTER_VAR" "o_orderpriority"
+        , defCol "OUTER_VAR" "o_clerk"
+        , defCol "OUTER_VAR" "o_shippriority"
+        , defCol "OUTER_VAR" "o_comment"
+        ]
+      , A.operator = seqOrdersSIG
+      , A.skewTable = "orders"
+      , A.skewColumn = 0
+      }
+  }
+
+hashJoin_H_customer :: A.Operator
+hashJoin_H_customer
+  = A.HASHJOIN
+    { A.targetlist =
+      [ defCol "OUTER_VAR" "l_orderkey"
+      , defCol "OUTER_VAR" "l_partkey"
+      , defCol "OUTER_VAR" "l_suppkey"
+      , defCol "OUTER_VAR" "l_linenumber"
+      , defCol "OUTER_VAR" "l_quantity"
+      , defCol "OUTER_VAR" "l_extendedprice"
+      , defCol "OUTER_VAR" "l_discount"
+      , defCol "OUTER_VAR" "l_tax"
+      , defCol "OUTER_VAR" "l_returnflag"
+      , defCol "OUTER_VAR" "l_linestatus"
+      , defCol "OUTER_VAR" "l_shipdate"
+      , defCol "OUTER_VAR" "l_commitdate"
+      , defCol "OUTER_VAR" "l_receiptdate"
+      , defCol "OUTER_VAR" "l_shipinstruct"
+      , defCol "OUTER_VAR" "l_shipmode"
+      , defCol "OUTER_VAR" "l_comment"
+      , defCol "OUTER_VAR" "o_orderkey"
+      , defCol "OUTER_VAR" "o_custkey"
+      , defCol "OUTER_VAR" "o_orderstatus"
+      , defCol "OUTER_VAR" "o_totalprice"
+      , defCol "OUTER_VAR" "o_orderdate"
+      , defCol "OUTER_VAR" "o_orderpriority"
+      , defCol "OUTER_VAR" "o_clerk"
+      , defCol "OUTER_VAR" "o_shippriority"
+      , defCol "OUTER_VAR" "o_comment"
+      , defCol "INNER_VAR" "c_custkey"
+      , defCol "INNER_VAR" "c_name" ]
+    , A.joinType = A.INNER
+    , A.inner_unique = False
+    , A.joinquals = []
+    , A.hashclauses = 
+      [A.OPEXPR
+        { A.oprname = "="
+        , A.oprargs =
+          [ A.VAR "OUTER_VAR" "o_custkey"
+          , A.VAR "INNER_VAR" "c_custkey"
+          ]
+        }
+      ]
+    , A.lefttree = hashJoin_Line_Orders
+    , A.righttree =
+      A.HASH
+      { A.targetlist =
+        [ defCol "OUTER_VAR" "c_custkey"
+        , defCol "OUTER_VAR" "c_name"
+        ]
+      , A.operator = seqCustomerSIG
+      , A.skewTable = "customer"
+      , A.skewColumn = 0
+      }
+  }
+
+sortSIG :: A.Operator
+sortSIG = A.SORT
+          { A.targetlist =
+            [ defCol "OUTER_VAR" "l_orderkey"
+            , defCol "OUTER_VAR" "l_partkey"
+            , defCol "OUTER_VAR" "l_suppkey"
+            , defCol "OUTER_VAR" "l_linenumber"
+            , defCol "OUTER_VAR" "l_quantity"
+            , defCol "OUTER_VAR" "l_extendedprice"
+            , defCol "OUTER_VAR" "l_discount"
+            , defCol "OUTER_VAR" "l_tax"
+            , defCol "OUTER_VAR" "l_returnflag"
+            , defCol "OUTER_VAR" "l_linestatus"
+            , defCol "OUTER_VAR" "l_shipdate"
+            , defCol "OUTER_VAR" "l_commitdate"
+            , defCol "OUTER_VAR" "l_receiptdate"
+            , defCol "OUTER_VAR" "l_shipinstruct"
+            , defCol "OUTER_VAR" "l_shipmode"
+            , defCol "OUTER_VAR" "l_comment"
+            , defCol "OUTER_VAR" "o_orderkey"
+            , defCol "OUTER_VAR" "o_custkey"
+            , defCol "OUTER_VAR" "o_orderstatus"
+            , defCol "OUTER_VAR" "o_totalprice"
+            , defCol "OUTER_VAR" "o_orderdate"
+            , defCol "OUTER_VAR" "o_orderpriority"
+            , defCol "OUTER_VAR" "o_clerk"
+            , defCol "OUTER_VAR" "o_shippriority"
+            , defCol "OUTER_VAR" "o_comment"
+            , defCol "OUTER_VAR" "c_custkey"
+            , defCol "OUTER_VAR" "c_name"
+            ]
+          , A.operator = hashJoin_H_customer
+          , A.sortCols = 
+            [ A.SortEx 27 True False
+            , A.SortEx 17 True False
+            ]
+          }
+
+aggSIG :: A.Operator
+aggSIG = A.AGG
+        { A.targetlist =
+          [ defCol "OUTER_VAR" "c_name"
+          , defCol "OUTER_VAR" "o_orderkey"
+          , defCol "OUTER_VAR" "o_orderdate"
+          , A.TargetEntry
+            { A.targetexpr =
+              A.FUNCEXPR
+              { A.funcname = "abs"
+              , A.funcargs =
+                [ A.OPEXPR
+                  { A.oprname = "-"
+                  , A.oprargs =
+                    [ A.VAR "OUTER_VAR" "o_totalprice"
+                    , A.AGGREF
+                      { A.aggname = "sum"
+                      , A.aggargs =
+                        [ A.TargetEntry
+                          { A.targetexpr =
+                            A.OPEXPR
+                            { A.oprname = "*"
+                            , A.oprargs =
+                              [ A.OPEXPR
+                                { A.oprname = "*"
+                                , A.oprargs =
+                                  [ A.VAR "OUTER_VAR" "l_extendedprice"
+                                  , A.OPEXPR
+                                    { A.oprname = "-"
+                                    , A.oprargs =
+                                      [ A.CONST "1" "numeric"
+                                      , A.VAR "OUTER_VAR" "l_discount"
+                                      ]
+                                    }
+                                  ]
+                                }
+                              , A.OPEXPR
+                                { A.oprname = "+"
+                                , A.oprargs =
+                                  [ A.CONST "1" "numeric"
+                                  , A.VAR "OUTER_VAR" "l_tax"
+                                  ]
+                                }
+                              ]
+                            }
+                          , A.targetresname = "sum"
+                          , A.resjunk = False
+                          }
+                        ]
+                      , A.aggdirectargs = []
+                      , A.aggorder = []
+                      , A.aggdistinct = []
+                      , A.aggfilter = Nothing
+                      , A.aggstar = False
+                      }
+                    ]
+                  }
+                ]
+              }
+            , A.targetresname = "deviation"
+            , A.resjunk = False }
+          ]
+        , A.qual =
+          [ A.NOT
+            A.OPEXPR
+            { A.oprname = "="
+            , A.oprargs =
+              [ A.AGGREF
+                { A.aggname = "sum"
+                , A.aggargs =
+                  [ A.TargetEntry
+                    { A.targetexpr =
+                      A.OPEXPR
+                      { A.oprname = "*"
+                      , A.oprargs =
+                        [ A.OPEXPR
+                          { A.oprname = "*"
+                          , A.oprargs =
+                            [ A.VAR "OUTER_VAR" "l_extendedprice"
+                            , A.OPEXPR
+                              { A.oprname = "-"
+                              , A.oprargs =
+                                [ A.CONST "1" "numeric"
+                                , A.VAR "OUTER_VAR" "l_discount"
+                                ]
+                              }
+                            ]
+                          }
+                        , A.OPEXPR
+                          { A.oprname = "+"
+                          , A.oprargs =
+                            [ A.CONST "1" "numeric"
+                            , A.VAR "OUTER_VAR" "l_tax"
+                            ]
+                          }
+                        ]
+                      }
+                    , A.targetresname = "sum"
+                    , A.resjunk = False
+                    }
+                  ]
+                , A.aggdirectargs = []
+                , A.aggorder = []
+                , A.aggdistinct = []
+                , A.aggfilter = Nothing
+                , A.aggstar = False
+                }
+              , A.VAR "OUTER_VAR" "o_totalprice"
+              ]
+            }
+          ]
+        , A.operator = sortSIG
+        , A.groupCols =
+          [ 1, 20, 21, 27 ]
+        , A.aggstrategy = A.AGG_SORTED
+        , A.aggsplit = [A.AGGSPLITOP_SIMPLE]
+        }
+
+sigPlan :: A.PlannedStmt
+sigPlan = A.PlannedStmt
+          { A.planTree = aggSIG
+          , A.subplans = []
+          }
 
 -- access list elements safely
 (!!) :: [a] -> Int -> Maybe a
@@ -3020,4 +3367,4 @@ main = do
     let authStr = forceEither $ get cp "Main" "dbauth" :: String
 
     -- checkAndGenerate authStr paragg
-    checkAndGenerateStmt authStr neumannQ2
+    checkAndGenerateStmt authStr sigPlan
