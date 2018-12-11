@@ -149,9 +149,10 @@ extract op = let
     (~>) operator
 
 
-(~>) (AGG {targetlist, operator})
+(~>) (AGG {targetlist, qual, operator})
   = do
     mapM_ (~~~>) targetlist
+    mapM_ (~~>) qual
     (~>) operator
 
 (~>) (WINDOWAGG {targetlist, operator, frameOptions, startOffset, endOffset})

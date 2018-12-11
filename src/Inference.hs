@@ -801,7 +801,7 @@ trOperator (I.BITMAPHEAPSCAN {I.targetlist, I.bitmapqualorig, I.operator, I.scan
               , O.scanrelid = index'
               , O.bitmapqualorig = O.List bitmapqualorig'}
 
-trOperator (I.AGG {I.targetlist, I.operator, I.groupCols, I.aggstrategy, I.aggsplit})
+trOperator (I.AGG {I.targetlist, I.operator, I.groupCols, I.aggstrategy, I.aggsplit, I.qual})
   = do
     context <- lift $ ask
 
@@ -822,6 +822,7 @@ trOperator (I.AGG {I.targetlist, I.operator, I.groupCols, I.aggstrategy, I.aggsp
 
     targetlist' <- local (const context') $ mapM trTargetEntry $ zip targetlist [1..]
 
+    qual' <- local (const context') $ mapM trExpr qual
 
     grpTargets <- mapM (getExprType . O.expr)
                           $ filter (\(O.TARGETENTRY {O.ressortgroupref=x}) -> x `elem` groupCols) ((\(O.List x) -> x) $ O.targetlist $ O.genericPlan operator') -- targetlist'
@@ -830,8 +831,9 @@ trOperator (I.AGG {I.targetlist, I.operator, I.groupCols, I.aggstrategy, I.aggsp
     ops <- mapM ((liftM fst) . searchOperator) $ zip grpTargets (repeat "=")
 
     return $ O.AGG
-              { O.genericPlan  = (O.defaultPlan { O.targetlist= O.List targetlist'
-                                                , O.lefttree = Just operator'})
+              { O.genericPlan  = (O.defaultPlan { O.targetlist = O.List targetlist'
+                                                , O.qual       = O.List qual'
+                                                , O.lefttree   = Just operator'})
               , O.aggstrategy  = I.aggStrategyToInt aggstrategy
               , O.aggsplit     = sum $ map I.aggSplitToInt aggsplit
               , O.numCols      = fromIntegral (length groupCols)
@@ -1546,8 +1548,11 @@ trSortEx targetlist (I.SortEx { I.sortTarget, I.sortASC, I.sortNullsFirst })
                 , O.hashable = O.PgBool hashable }
 
 searchOperator :: Rule (Integer, String) (Integer, Bool)
-searchOperator (typ, op)
+searchOperator (typ', op)
   = do
+    let typ = case typ' of
+              1043 -> 25   -- VARCHAR === TEXT
+              x    -> x
     -- Get tables from context, we have to do it that way instead of via
     -- findRow, because we need to perform a search using multiple qualifications.
     td <- getRTableData ()
@@ -1560,7 +1565,7 @@ searchOperator (typ, op)
 
     -- No operator matching the argument types or operator name exists.
     when (null row)
-      $ error $ "searchOperator: no operator found"
+      $ error $ "searchOperator: no operator found " ++ show typ ++ " " ++ show op
 
     let opno       = fromSql $ head row M.! "oid"
     let oprcanhash = fromSql $ head row M.! "oprcanhash"

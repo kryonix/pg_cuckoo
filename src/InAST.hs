@@ -120,10 +120,12 @@ data Operator = SEQSCAN
                 }
               | AGG
                 { targetlist  :: [TargetEntry]
+                , qual        :: [Expr]
                 , operator    :: Operator
                 , groupCols   :: [Integer]
                 , aggstrategy :: AggStrategy
                 , aggsplit    :: [AggSplit]
+                -- HAVING IS MISSING HERE!!!
                 }
               | WINDOWAGG
                 { targetlist :: [TargetEntry]
