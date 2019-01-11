@@ -23,7 +23,7 @@ dependencies:
 - megaparsec
 - pretty-show
 - HDBC
-- HDBC-postgresql == 2.3.2.5
+- HDBC-postgresql == 2.3.2.6
 - mtl
 - containers
 - MissingH
