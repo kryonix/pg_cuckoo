@@ -61,10 +61,7 @@ parseConst authStr p@(I.CONST {I.constvalue=constvalue, I.consttype=consttype})
 checkAndGenerateStmt :: String -> I.PlannedStmt -> IO (O.PLANNEDSTMT, String, String)
 checkAndGenerateStmt authStr op = do
     -- Validate the AST
-    putStrLn $ "Validate: "
     let errs = V.validatePlannedStmt op
-    -- Print errors
-    -- putStrLn $ intercalate "\n" errs
 
     unless (null errs) $
       do
@@ -75,19 +72,11 @@ checkAndGenerateStmt authStr op = do
 
     -- Use Extract.hs to extract information from AST to be pre-transformed etc.
     let consts = E.extractP op
-    putStrLn $ PP.ppShow consts
-
     -- Compile constants
     consts' <- mapM (\x -> parseConst authStr x >>= \p -> return (x, p)) $ lgconsts consts
     
-    -- Debug output of constants
-    putStrLn $ PP.ppShow consts'
-
     -- Infere output AST
     let infered = generatePlan tableDataR consts' (lgTableNames consts) (lgScan consts) op
-    putStrLn $ PP.ppShow op
-    -- Print AST structure as well as the postgres plan
-    putStrLn $ PP.ppShow infered
     let pgplan = gprint infered
     -- putStrLn $ "Explain: "
     let s1 = "select _pq_plan_explain('" ++ pgplan ++ "', true);"
