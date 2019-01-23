@@ -1,13 +1,20 @@
 module Lib
     ( parseConst
+    , checkAndGenerateStmt
     ) where
 
 import Reader as R
 import TrChunks as T
 import GetTable as Td
 import qualified InAST as I
-import qualified PgPlan as O
+import PgPlan as O
+import qualified Validate as V
+import Inference as IF
+import Extract as E
+import GPrint as G
+import Text.Show.Pretty as PP hiding (List, Value, Float)
 import Debug.Trace
+import Data.List
 import Control.Monad
 -- | access list elements safely
 (!!) :: [a] -> Int -> Maybe a
@@ -51,3 +58,39 @@ parseConst authStr p@(I.CONST {I.constvalue=constvalue, I.consttype=consttype})
     let finalConst = T.translate f
     return finalConst
 
+checkAndGenerateStmt :: String -> I.PlannedStmt -> IO (O.PLANNEDSTMT, String, String)
+checkAndGenerateStmt authStr op = do
+    -- Validate the AST
+    putStrLn $ "Validate: "
+    let errs = V.validatePlannedStmt op
+    -- Print errors
+    -- putStrLn $ intercalate "\n" errs
+
+    unless (null errs) $
+      do
+        error $ "AST is invalid:\n" ++ intercalate "\n" errs
+
+    -- Get Catalog data
+    tableDataR <- getTableData authStr
+
+    -- Use Extract.hs to extract information from AST to be pre-transformed etc.
+    let consts = E.extractP op
+    putStrLn $ PP.ppShow consts
+
+    -- Compile constants
+    consts' <- mapM (\x -> parseConst authStr x >>= \p -> return (x, p)) $ lgconsts consts
+    
+    -- Debug output of constants
+    putStrLn $ PP.ppShow consts'
+
+    -- Infere output AST
+    let infered = generatePlan tableDataR consts' (lgTableNames consts) (lgScan consts) op
+    putStrLn $ PP.ppShow op
+    -- Print AST structure as well as the postgres plan
+    putStrLn $ PP.ppShow infered
+    let pgplan = gprint infered
+    -- putStrLn $ "Explain: "
+    let s1 = "select _pq_plan_explain('" ++ pgplan ++ "', true);"
+    -- putStrLn $ "Execute:"
+    let s2 = "select _pq_plan_deserialize('" ++ pgplan ++ "');"
+    return (infered, s1, s2)

@@ -3345,7 +3345,7 @@ checkAndGenerateStmt authStr op = do
 
   -- Infere output AST
   let infered = generatePlan tableDataR consts' (lgTableNames consts) (lgScan consts) op
-  
+  putStrLn $ PP.ppShow op
   -- Print AST structure as well as the postgres plan
   putStrLn $ PP.ppShow infered
   let pgplan = gprint infered
@@ -3367,4 +3367,4 @@ main = do
     let authStr = forceEither $ get cp "Main" "dbauth" :: String
 
     -- checkAndGenerate authStr paragg
-    checkAndGenerateStmt authStr sigPlan
+    Main.checkAndGenerateStmt authStr sigPlan
