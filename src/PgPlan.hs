@@ -702,6 +702,12 @@ data Expr = VAR
             , paramcollid :: Integer
             , location    :: Integer
             }
+          | NULLTEST
+            { arg          :: Expr
+            , nulltesttype :: Integer
+            , argisrow     :: PgBool
+            , location     :: Integer
+            }
     deriving (Eq, Show, Generic, GPrint)
 
 data SORTGROUPCLAUSE = SORTGROUPCLAUSE
