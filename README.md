@@ -48,6 +48,6 @@ We will use this information to reproduce your problem locally.
 
 # Author
 
-Denis Hirn (@kryonix)
+Denis Hirn
 
 Copyright (c) 2018-2019, Denis Hirn
