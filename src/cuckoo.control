@@ -1,5 +1,3 @@
-# Extension to generate postgres AST structures
-comment = 'Interface to the postgres plan generator cuckoo'
+comment = 'PGcuckoo extension'
 default_version = '1.0'
 module_pathname = '$libdir/cuckoo'
-# requires = 'plpgsql'

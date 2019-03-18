@@ -4,59 +4,20 @@
 #include "utils/builtins.h"
 #include "parser/parser.h"
 #include "parser/analyze.h"
-// #include "tcop/tcopprot.h"
 #include "nodes/print.h"
 #include "nodes/makefuncs.h"
-
-// #include "access/htup_details.h"
-// #include "access/xact.h"
-// #include "catalog/dependency.h"
-// #include "catalog/indexing.h"
-// #include "catalog/objectaccess.h"
-// #include "catalog/pg_language.h"
-// #include "catalog/pg_namespace.h"
-
-// #include "catalog/pg_proc.h"
-
-// #include "catalog/pg_proc_fn.h"
-// #include "catalog/pg_transform.h"
 
 #include "catalog/pg_type.h"
 #include "catalog/pg_collation.h"
 
-// #include "commands/defrem.h"
-
-// #include "executor/functions.h"
-
 #include "funcapi.h"
-// #include "mb/pg_wchar.h"
 #include "miscadmin.h"
 #include "nodes/nodeFuncs.h"
-// #include "parser/parse_type.h"
-// #include "tcop/pquery.h"
-// #include "utils/acl.h"
-// #include "utils/lsyscache.h"
-// #include "utils/rel.h"
 
 #include "utils/syscache.h"
-
-// #include "lib/stringinfo.h"
-
 #include "executor/spi_priv.h"
-
-// #include "parser/parse_coerce.h"
 #include "tcop/utility.h"
-// #include "tsearch/ts_locale.h"
-
-// #include "utils/guc.h"
-// #include "utils/memutils.h"
-// #include "utils/typcache.h"
-// #include "utils/varlena.h"
-
 #include "nodes/readfuncs.h"
-
-
-// #include "pgstat.h"
 
 #include "optimizer/planner.h"
 
@@ -68,6 +29,11 @@ PG_MODULE_MAGIC;
 #endif
 
 text *format_node(Node *node, bool pretty);
+PlannedStmt *sr_planner(Query *parse,
+            int cursorOptions,
+            ParamListInfo boundParams);
+
+PlannedStmt* myPlan = NULL;
 
 text *
 format_node(Node *node, bool pretty)
@@ -90,27 +56,20 @@ format_node(Node *node, bool pretty)
   return out_t;
 }
 
-
-PlannedStmt *sr_planner(Query *parse,
-            int cursorOptions,
-            ParamListInfo boundParams);
-
-PlannedStmt* myEvilPlan = NULL;
-
 // As soon as the planner_hook is set, we simply ignore the input from the
-// planner and instead return myEvilPlan, which will hold the plan we enforce.
+// planner and instead return myPlan, which will hold the plan we enforce.
 PlannedStmt *sr_planner(Query *parse,
             int cursorOptions,
             ParamListInfo boundParams)
 {
   planner_hook=NULL;
-  return myEvilPlan;
+  return myPlan;
 }
 
-PG_FUNCTION_INFO_V1(pq_plan_serialize);
+PG_FUNCTION_INFO_V1(pg_plan_serialize);
 
 Datum
-pq_plan_serialize(PG_FUNCTION_ARGS)
+pg_plan_serialize(PG_FUNCTION_ARGS)
 {
   text  *query_string_t = PG_GETARG_TEXT_P(0);
   bool pretty = PG_GETARG_BOOL(1);
@@ -138,10 +97,14 @@ pq_plan_serialize(PG_FUNCTION_ARGS)
   PG_RETURN_TEXT_P(out);
 }
 
-PG_FUNCTION_INFO_V1(pq_plan_deserialize2);
+PG_FUNCTION_INFO_V1(pg_plan_execute);
+
+/* This function takes the string representation of a plan and returns the result
+   as table valued function.
+ */
 
 Datum
-pq_plan_deserialize2(PG_FUNCTION_ARGS)
+pg_plan_execute(PG_FUNCTION_ARGS)
 {
   ReturnSetInfo *rsinfo = (ReturnSetInfo *) fcinfo->resultinfo;
   Tuplestorestate *tupstore;
@@ -178,13 +141,18 @@ pq_plan_deserialize2(PG_FUNCTION_ARGS)
 
   per_query_ctx = rsinfo->econtext->ecxt_per_query_memory;
 
-
   // Deserialize the Plan
   result = (Node*) stringToNode(nodeChar);
+
+  if(!IsA(result, PlannedStmt))
+    ereport(ERROR,
+          (errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+          errmsg("provided input is not a plan")));
+
   outputstr = format_node((Node*) result, false);
 
   // Setup the plan we want to execute
-  myEvilPlan = (PlannedStmt*) result;
+  myPlan = (PlannedStmt*) result;
 
   // ENGAGE BRAIN HERE
 
@@ -195,18 +163,15 @@ pq_plan_deserialize2(PG_FUNCTION_ARGS)
   planner_hook = &sr_planner;
 
   // Startup a simple SPI connection, which we will abuse to execute
-  // our 'evil plan'.
+  // our injected plan.
   /* Connect to SPI manager */
   if ((ret = SPI_connect()) < 0)
     /* internal error */
     elog(ERROR, "SPI_connect returned %d", ret);
 
-
   // Let SPI prepare a query
-  // We might just replace SPI_prepare and SPI_execute_plan by SPI_execute
-  // in the future.
   res = SPI_prepare("select 1", 0, NULL);
-  elog(INFO, "prepared");
+  //elog(INFO, "prepared");
   
   // Execute the plan.
  ret = SPI_execute_plan(res, NULL, NULL, false, 0);
@@ -284,13 +249,12 @@ pq_plan_deserialize2(PG_FUNCTION_ARGS)
   // </Query-Plan Injection Code>
 
   return (Datum) 0;
-//  PG_RETURN_TEXT_P(outputstr);
 }
 
-PG_FUNCTION_INFO_V1(pq_plan_deserialize);
+PG_FUNCTION_INFO_V1(pg_plan_execute_print);
 
 Datum
-pq_plan_deserialize(PG_FUNCTION_ARGS)
+pg_plan_execute_print(PG_FUNCTION_ARGS)
 {
   text *nodeText = PG_GETARG_TEXT_P(0);
   Node *result;
@@ -306,8 +270,13 @@ pq_plan_deserialize(PG_FUNCTION_ARGS)
   result = (Node*) stringToNode(nodeChar);
   outputstr = format_node((Node*) result, false);
 
+  if(!IsA(result, PlannedStmt))
+    ereport(ERROR,
+          (errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+          errmsg("provided input is not a plan")));
+
   // Setup the plan we want to execute
-  myEvilPlan = (PlannedStmt*) result;
+  myPlan = (PlannedStmt*) result;
 
   // ENGAGE BRAIN HERE
 
@@ -317,15 +286,10 @@ pq_plan_deserialize(PG_FUNCTION_ARGS)
   // plan whatever the input is, we inject our own plan into the system.
   planner_hook = &sr_planner;
 
-  // Startup a simple SPI connection, which we will abuse to execute
-  // our 'evil plan'.
   SPI_connect();
 
   // Let SPI prepare a query
-  // We might just replace SPI_prepare and SPI_execute_plan by SPI_execute
-  // in the future.
   res = SPI_prepare("select 1", 0, NULL);
-  elog(INFO, "prepared");
   
   // Execute the plan.
  ret = SPI_execute_plan(res, NULL, NULL, false, 0);
@@ -381,10 +345,10 @@ pq_plan_deserialize(PG_FUNCTION_ARGS)
   PG_RETURN_TEXT_P(outputstr);
 }
 
-PG_FUNCTION_INFO_V1(pq_plan_explain);
+PG_FUNCTION_INFO_V1(pg_plan_explain);
 
 Datum
-pq_plan_explain(PG_FUNCTION_ARGS)
+pg_plan_explain(PG_FUNCTION_ARGS)
 {
   text *nodeText = PG_GETARG_TEXT_P(0);
   Node *plan;
@@ -416,7 +380,6 @@ pq_plan_explain(PG_FUNCTION_ARGS)
     }
     PG_CATCH();
     {
-      /* Magic hack but work. In ExplainOnePlan we twice touched snapshot before die.*/
       UnregisterSnapshot(GetActiveSnapshot());
       UnregisterSnapshot(GetActiveSnapshot());
       PopActiveSnapshot();
@@ -428,29 +391,10 @@ pq_plan_explain(PG_FUNCTION_ARGS)
   }
   else
   {
-    PG_RETURN_TEXT_P(cstring_to_text("Not found plan"));
+    PG_RETURN_TEXT_P(cstring_to_text("Input is not a plan"));
   }
 }
 
-// AST-Node generators
-
-static Datum string_to_datum (const char *str, Oid datatype);
-static Datum string_to_datum  ( const char *str,
-                                Oid datatype)
-{
-    Assert(str != NULL);
-
-    /*
-     * We cheat a little by assuming that CStringGetTextDatum() will do for
-     * bpchar and varchar constants too...
-     */
-    if (datatype == NAMEOID)
-        return DirectFunctionCall1(namein, CStringGetDatum(str));
-    else if (datatype == BYTEAOID)
-        return DirectFunctionCall1(byteain, CStringGetDatum(str));
-    else
-        return CStringGetTextDatum(str);
-}
 
 /**
  * string_to_const
@@ -500,51 +444,3 @@ Datum string_to_const(PG_FUNCTION_ARGS)
 
   PG_RETURN_TEXT_P(out);
 }
-
-// Datum string_to_const(PG_FUNCTION_ARGS)
-// {
-//   text *inputText = PG_GETARG_TEXT_P(0);
-//   char *inputChar = text_to_cstring(inputText);
-//   Oid  datatype   = PG_GETARG_OID(1);
-
-//   Const *constNode;
-//   text  *out;
-
-//   Datum       conval = string_to_datum(inputChar, datatype);
-//   Oid         collation;
-//   int         constlen;
-
-//   /*
-//   * We only need to support a few datatypes here, so hard-wire properties
-//   * instead of incurring the expense of catalog lookups.
-//   */
-//   switch (datatype)
-//   {
-//      case TEXTOID:
-//      case VARCHAROID:
-//      case BPCHAROID:
-//          collation = DEFAULT_COLLATION_OID;
-//          constlen = -1;
-//          break;
-
-//      case NAMEOID:
-//          collation = InvalidOid;
-//          constlen = NAMEDATALEN;
-//          break;
-
-//      case BYTEAOID:
-//          collation = InvalidOid;
-//          constlen = -1;
-//          break;
-
-//      default:
-//          elog(ERROR, "unexpected datatype in string_to_const: %u",
-//               datatype);
-//   }
-
-//   constNode = makeConst(datatype, -1, collation, constlen,
-//                         conval, false, false);
-
-//   out = format_node((Node*) constNode, false);
-//   PG_RETURN_TEXT_P(out);
-// }
