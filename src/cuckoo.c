@@ -178,7 +178,7 @@ pg_plan_execute(PG_FUNCTION_ARGS)
 
   // Execution is done at this point, print the result of the query
   proc = SPI_processed; // Number of rows
-  elog(INFO, "executed, rows: %lu", proc);
+  // elog(INFO, "executed, rows: %lu", proc);
 
   /* If no qualifying tuples, fall out early */
   if (ret != SPI_OK_SELECT || proc == 0)
@@ -209,32 +209,20 @@ pg_plan_execute(PG_FUNCTION_ARGS)
 
   attinmeta = TupleDescGetAttInMetadata(tupdesc);
 
-  char buf[8192];
   uint64 j;
 
-  int i;
-  // Print the header
-  for (i = 1, buf[0] = 0; i <= tupdesc->natts; i++)
-          snprintf(buf + strlen (buf), sizeof(buf) - strlen(buf), " %s%s",
-                  SPI_fname(tupdesc, i),
-                  (i == tupdesc->natts) ? " " : " |");
-      elog(INFO, "EXECQ: %s", buf);
-
-  // Print result rows
+  // Fetch result tuples
   for (j = 0; j < proc; j++)
   {
       HeapTuple tuple = tuptable->vals[j];
       tuplestore_puttuple(tupstore, tuple);
       int i;
 
-      for (i = 1, buf[0] = 0; i <= tupdesc->natts; i++)
-          snprintf(buf + strlen (buf), sizeof(buf) - strlen(buf), " %s%s",
-                  SPI_getvalue(tuple, tupdesc, i),
-                  (i == tupdesc->natts) ? " " : " |");
-      elog(INFO, "EXECQ: %s", buf);
+      for (i = 1; i <= tupdesc->natts; i++)
+          SPI_getvalue(tuple, tupdesc, i);
   }
 
-  elog(INFO, "ret: %u", ret); // Returncode
+  // elog(INFO, "ret: %u", ret); // Returncode
 
   rsinfo->returnMode = SFRM_Materialize;
   rsinfo->setResult = tupstore;
