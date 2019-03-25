@@ -57,7 +57,8 @@ INSERT INTO "exams" (sid,course,curriculum,date,grade) VALUES (81,9,'DB2','17',6
 INSERT INTO "exams" (sid,course,curriculum,date,grade) VALUES (91,8,'DB1','18',5),(92,6,'Adv Sql','19',3),(93,9,'DB2','18',6),(94,9,'DB2','19',4),(95,8,'Adv Sql','18',2),(96,1,'DB1','17',3),(97,3,'DB2','18',5),(98,7,'DB1','18',3),(99,9,'DB2','18',6),(100,4,'DB1','19',2);
 
 -- Q1
-
+CREATE INDEX student_id ON students(id);
+CREATE INDEX exams_sid ON exams(sid);
 explain analyze
 select s.name, e.course
 from   students s, exams e
