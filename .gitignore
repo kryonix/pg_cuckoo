@@ -1,3 +1,5 @@
 .stack-work/
 cuckoo.cabal
 *~
+execute.sql
+explain.sql
