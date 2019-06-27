@@ -24,16 +24,205 @@
 #include "commands/explain.h"
 #include "utils/snapmgr.h"
 
+#include "access/hash.h"
+
+#include "utils/memutils.h"
+
 #ifdef PG_MODULE_MAGIC
 PG_MODULE_MAGIC;
 #endif
 
+void _PG_init(void);
+void _PG_fini(void);
+
 text *format_node(Node *node, bool pretty);
-PlannedStmt *sr_planner(Query *parse,
+PlannedStmt *injection_planner(Query *parse,
             int cursorOptions,
             ParamListInfo boundParams);
 
 PlannedStmt* myPlan = NULL;
+
+static void query_hash_hook(ParseState *pstate, Query *query);
+PlannedStmt *cache_planner(Query *parse, int cursorOptions, ParamListInfo boundParams);
+
+static bool pg_cuckoo_cache_enabled;
+
+PG_FUNCTION_INFO_V1(pg_cuckoo_enable_cache);
+Datum pg_cuckoo_enable_cache(PG_FUNCTION_ARGS);
+PG_FUNCTION_INFO_V1(pg_cuckoo_disable_cache);
+Datum pg_cuckoo_disable_cache(PG_FUNCTION_ARGS);
+
+
+void _PG_init(void)
+{
+  DefineCustomBoolVariable("pg_cuckoo.cache",
+                            "Enable / Disable pg_cuckoo plan cache",
+                            NULL,
+                            &pg_cuckoo_cache_enabled,
+                            false,
+                            PGC_USERSET,
+                            0,
+                            NULL,
+                            NULL,
+                            NULL);
+
+  post_parse_analyze_hook = query_hash_hook;
+  planner_hook = cache_planner;
+}
+
+void _PG_fini(void)
+{
+
+}
+
+Datum pg_cuckoo_enable_cache(PG_FUNCTION_ARGS)
+{
+  (void) set_config_option("pg_cuckoo.cache", "ON", PGC_USERSET, PGC_S_OVERRIDE, GUC_ACTION_SAVE, true, 0, false);
+  PG_RETURN_VOID();
+}
+
+Datum pg_cuckoo_disable_cache(PG_FUNCTION_ARGS)
+{
+  (void) set_config_option("pg_cuckoo.cache", "OFF", PGC_USERSET, PGC_S_OVERRIDE, GUC_ACTION_SAVE, true, 0, false);
+  PG_RETURN_VOID();
+}
+
+static void query_hash_hook(ParseState *pstate, Query *query)
+{
+  query->queryId = (uint64) DatumGetUInt32(hash_any( (const unsigned char*) pstate->p_sourcetext, strlen(pstate->p_sourcetext)));
+}
+
+PlannedStmt *cache_planner(Query *parse, int cursorOptions, ParamListInfo boundParams)
+{
+  PlannedStmt* planToForce = NULL;
+  MemoryContext oldCurr = CurrentMemoryContext;
+
+  elog(INFO, "cache_planner");
+  if(myPlan != NULL)
+  {
+    return myPlan;
+  }
+
+  elog(INFO, "Query ID: %u", parse->queryId);
+
+  if(!pg_cuckoo_cache_enabled)
+  {
+    return standard_planner(parse, cursorOptions, boundParams);
+  }
+
+  int ret;
+  uint64 proc;
+
+  if ((ret = SPI_connect()) < 0)
+  /* internal error */
+  elog(ERROR, "SPI_connect returned %d", ret);
+
+  // Let SPI prepare a query
+  
+  Oid argtypes[1] = { INT8OID };
+  Datum values[1] = { Int64GetDatum(parse->queryId) };
+
+  planner_hook = NULL;
+
+  ret = SPI_execute_with_args("select * from plan_cache where query_id = $1;"
+                              , 1
+                              , argtypes
+                              , values
+                              , NULL
+                              , true
+                              , 1 );
+
+  // Execution is done at this point, print the result of the query
+  proc = SPI_processed; // Number of rows
+  // elog(INFO, "executed, rows: %lu", proc);
+
+  /* If no qualifying tuples, fall out early */
+  if (ret != SPI_OK_SELECT || proc == 0)
+  {
+    SPI_finish();
+    elog(INFO, "No plan in cache");
+
+    PlannedStmt* plan = standard_planner(parse, cursorOptions, boundParams);
+
+    text* plantext = format_node((Node*) plan, false);
+
+    if ((ret = SPI_connect()) < 0)
+    /* internal error */
+    elog(ERROR, "SPI_connect returned %d", ret);
+
+    Oid argtypes[3] = { INT8OID, INT8OID, TEXTOID };
+    Datum values[3] = { Int64GetDatum(parse->queryId), Int64GetDatum(hash_any( (const unsigned char*) plantext, 64)), CStringGetDatum(plantext) };
+
+    ret = SPI_execute_with_args("INSERT INTO plan_cache VALUES($1,$2,$3,false);"
+                               , 3
+                               , argtypes
+                               , values
+                               , NULL
+                               , false
+                               , 1 );
+
+    planner_hook = &cache_planner;
+    SPI_finish();
+
+    return plan;
+  }
+  else
+  {
+    elog(INFO, "Found a cache entry");
+
+    TupleDesc tupdesc = SPI_tuptable->tupdesc;
+    SPITupleTable *tuptable = SPI_tuptable;
+    uint64 j;
+
+    int forceColId = SPI_fnumber(tupdesc, "force_plan");
+    int plantextID = SPI_fnumber(tupdesc, "query_plan");
+
+    for (j = 0; j < proc; j++)
+    {
+      HeapTuple tuple = tuptable->vals[j];
+
+      bool force = false;
+      text* plan_string;
+      bool isnull = false;
+      force = DatumGetBool(SPI_getbinval(tuple, tupdesc, forceColId, &isnull));
+      plan_string = DatumGetTextP(SPI_getbinval(tuple, tupdesc, plantextID, &isnull));
+
+      if(force) {
+        char *nodeText = text_to_cstring(plan_string);
+        elog(INFO, "Should force a plan!");
+
+        // We MUST switch the memory context here. Otherwise planToForce
+        // is allocated in the wrong context and PG crashes.
+        MemoryContextSwitchTo(oldCurr);
+
+        planToForce = (PlannedStmt*) stringToNode( nodeText );
+
+        // Perform a sanity check.
+        if(IsA(planToForce, PlannedStmt)) {
+          // planToForce resembles a PlannedStmt, so we are good to go!
+          break;
+        } else {
+          // Something is wrong. Parsing of nodeText did not result in a PlannedStmt.
+          elog(INFO, "Error while reconstructing plan");
+          planToForce = NULL;
+          break;
+        }
+      }
+    }
+
+    planner_hook = &cache_planner;
+    SPI_finish();
+
+    if(planToForce == NULL) {
+      elog(INFO, "planToForce is null, use standard_planner instead!");
+      return standard_planner(parse, cursorOptions, boundParams);
+    }
+
+    return planToForce;
+  }
+
+  return standard_planner(parse, cursorOptions, boundParams);
+}
 
 text *
 format_node(Node *node, bool pretty)
@@ -58,7 +247,7 @@ format_node(Node *node, bool pretty)
 
 // As soon as the planner_hook is set, we simply ignore the input from the
 // planner and instead return myPlan, which will hold the plan we enforce.
-PlannedStmt *sr_planner(Query *parse,
+PlannedStmt *injection_planner(Query *parse,
             int cursorOptions,
             ParamListInfo boundParams)
 {
@@ -160,7 +349,7 @@ pg_plan_execute(PG_FUNCTION_ARGS)
   // By setting planner_hook here we basically DISABLE the Postgres
   // Planner completely! Instead of giving Postgres the chance to
   // plan whatever the input is, we inject our own plan into the system.
-  planner_hook = &sr_planner;
+  planner_hook = &injection_planner;
 
   // Startup a simple SPI connection, which we will abuse to execute
   // our injected plan.
@@ -272,7 +461,7 @@ pg_plan_execute_print(PG_FUNCTION_ARGS)
   // By setting planner_hook here we basically DISABLE the Postgres
   // Planner completely! Instead of giving Postgres the chance to
   // plan whatever the input is, we inject our own plan into the system.
-  planner_hook = &sr_planner;
+  planner_hook = &injection_planner;
 
   SPI_connect();
 
