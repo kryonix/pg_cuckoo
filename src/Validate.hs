@@ -1,7 +1,9 @@
 {-|
 Module      : Validate
 Description : This module checks whether a given input AST is valid or not
-Author      : Denis Hirn
+Copyright   : © Denis Hirn <denis.hirn@uni-tuebingen.de>
+License     : AllRightsReserved
+Maintainer  : Denis Hirn
 
 This module does a traversal of the given AST.
 Errors are collected and can then be used for error messages.

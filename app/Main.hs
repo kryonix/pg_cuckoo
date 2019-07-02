@@ -3314,9 +3314,9 @@ checkAndGenerate authStr op = do
   putStrLn $ PP.ppShow infered
   let pgplan = gprint infered
   -- putStrLn $ "Explain: "
-  writeFile "explain.sql" $ "select _pq_plan_explain('" ++ pgplan ++ "', true);"
+  writeFile "explain.sql" $ "select plan_explain('" ++ pgplan ++ "', true);"
   -- putStrLn $ "Execute:"
-  writeFile "execute.sql" $ "select _pq_plan_deserialize('" ++ pgplan ++ "');"
+  writeFile "execute.sql" $ "select plan_execute('" ++ pgplan ++ "');"
 
 checkAndGenerateStmt :: String -> A.PlannedStmt -> IO ()
 checkAndGenerateStmt authStr op = do
@@ -3350,9 +3350,9 @@ checkAndGenerateStmt authStr op = do
   putStrLn $ PP.ppShow infered
   let pgplan = gprint infered
   -- putStrLn $ "Explain: "
-  writeFile "explain.sql" $ "select _pq_plan_explain('" ++ pgplan ++ "', true);"
+  writeFile "explain.sql" $ "select plan_explain('" ++ pgplan ++ "', true);"
   -- putStrLn $ "Execute:"
-  writeFile "execute.sql" $ "select _pq_plan_deserialize('" ++ pgplan ++ "');"
+  writeFile "execute.sql" $ "select plan_execute('" ++ pgplan ++ "');"
 
 
 main :: IO ()
@@ -3366,5 +3366,5 @@ main = do
     let cp = forceEither config
     let authStr = forceEither $ get cp "Main" "dbauth" :: String
 
-    -- checkAndGenerate authStr paragg
-    Main.checkAndGenerateStmt authStr sigPlan
+    checkAndGenerate authStr agg2
+    -- Main.checkAndGenerateStmt authStr sigPlan

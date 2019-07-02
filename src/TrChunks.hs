@@ -1,3 +1,10 @@
+{-|
+Module      : TrChunks
+Description : Translate constant SQL Values to Haskell ADTs
+Copyright   : © Denis Hirn <denis.hirn@uni-tuebingen.de>
+License     : AllRightsReserved
+Maintainer  : Denis Hirn
+-}
 
 module TrChunks ( translate ) where
 

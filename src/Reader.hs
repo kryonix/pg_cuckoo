@@ -1,8 +1,10 @@
--- author: Tobias Müller, 2016
---         Denis Hirn, 2017-
-
--- parse the log
--- avoid doing transformations
+{-|
+Module      : Reader
+Description : Parses the PostgreSQL Log-Format
+Copyright   : © Denis Hirn <denis.hirn@uni-tuebingen.de>
+License     : AllRightsReserved
+Maintainer  : Denis Hirn
+-}
 
 {-# LANGUAGE PatternSynonyms #-}
 

@@ -1,7 +1,7 @@
 {-|
 Module      : GetTable
 Description : This module extracts data from PSQL
-Copyright   : © Denis Hirn <denis.hirn@student.uni-tuebingen.de>
+Copyright   : © Denis Hirn <denis.hirn@uni-tuebingen.de>
 License     : AllRightsReserved
 Maintainer  : Denis Hirn
 -}

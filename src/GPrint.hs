@@ -1,7 +1,9 @@
 {-|
 Module      : GPrint
 Description : Generic printer implementation
-Author      : Denis Hirn
+Copyright   : © Denis Hirn <denis.hirn@uni-tuebingen.de>
+License     : AllRightsReserved
+Maintainer  : Denis Hirn
 
 This is the place where magic happens ¯\_(ツ)_/¯
 -}

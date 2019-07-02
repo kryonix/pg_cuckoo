@@ -1,7 +1,10 @@
 {-|
 Module      : PgPlan
 Description : This module defines the data structures postgres expects (pretty printed)
-Author      : Denis Hirn
+Copyright   : © Denis Hirn <denis.hirn@uni-tuebingen.de>
+License     : AllRightsReserved
+Maintainer  : Denis Hirn
+
 
 The defined data types relate 1:1 to postgres plan nodes.
 See: src/postgres/include/nodes/plannodes.h

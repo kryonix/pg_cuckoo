@@ -1,8 +1,9 @@
 {-|
 Module      : InAST
 Description : Defines the input AST structure
-Author      : Denis Hirn
-
+Copyright   : © Denis Hirn <denis.hirn@uni-tuebingen.de>
+License     : AllRightsReserved
+Maintainer  : Denis Hirn
 -}
 
 module InAST ( PlannedStmt(..)

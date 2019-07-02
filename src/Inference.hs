@@ -1,8 +1,9 @@
 {-|
 Module      : Inference
 Description : Performs inference rules
-Author      : Denis Hirn
-
+Copyright   : © Denis Hirn <denis.hirn@uni-tuebingen.de>
+License     : AllRightsReserved
+Maintainer  : Denis Hirn
 -}
 
 {-# LANGUAGE NamedFieldPuns #-}

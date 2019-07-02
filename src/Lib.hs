@@ -1,3 +1,11 @@
+{-|
+Module      : Lib
+Description : Cuckoo Interface
+Copyright   : © Denis Hirn <denis.hirn@uni-tuebingen.de>
+License     : AllRightsReserved
+Maintainer  : Denis Hirn
+-}
+
 module Lib
     ( parseConst
     , checkAndGenerateStmt
