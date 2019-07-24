@@ -97,13 +97,13 @@ PlannedStmt *cache_planner(Query *parse, int cursorOptions, ParamListInfo boundP
   PlannedStmt* planToForce = NULL;
   MemoryContext oldCurr = CurrentMemoryContext;
 
-  elog(INFO, "cache_planner");
+  // elog(INFO, "cache_planner");
   if(myPlan != NULL)
   {
     return myPlan;
   }
 
-  elog(INFO, "Query ID: %u", parse->queryId);
+  // elog(INFO, "Query ID: %u", parse->queryId);
 
   if(!pg_cuckoo_cache_enabled)
   {
