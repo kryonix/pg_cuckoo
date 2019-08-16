@@ -3,11 +3,12 @@
 -- edit: generalised [l] to Monoid l (Tobias, 2016)
 -- edit: add runOperSemST which allows to inspect the final state (Denis Hirn, 2017)
 
-module OperSem (OperSem,
-                runOperSem,
-                runOperSemST,
-                module Monads) where
-
+module Database.PgCuckoo.OperSem
+    ( OperSem
+    , runOperSem
+    , runOperSemST
+    , module Monads
+    ) where
 
 import Control.Monad.Except as Monads
 import Control.Monad.Reader as Monads

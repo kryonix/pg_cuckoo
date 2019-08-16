@@ -8,21 +8,23 @@ Maintainer  : Denis Hirn
 
 {-# LANGUAGE PatternSynonyms #-}
 
-module Reader (parseLog
-              , Chunk(..)
-              , pattern Chunk
-              , Fields
-              , Value(..)) where
+module Database.PgCuckoo.Reader
+    ( parseLog
+    , Chunk(..)
+    , pattern Chunk
+    , Fields
+    , Value(..)
+    ) where
 
-import Prelude hiding (sequence)
-import Text.Megaparsec
-import Text.Megaparsec.Char as M
+import           Prelude hiding (sequence)
+import           Text.Megaparsec
+import           Text.Megaparsec.Char as M
 import qualified Text.Megaparsec.Char.Lexer as L
-import Control.Applicative as A hiding (many)
-import Control.Monad (void)
-import Data.Void
-import Data.Map as M
-import Data.List (intercalate)
+import           Control.Applicative as A hiding (many)
+import           Control.Monad (void)
+import           Data.Void
+import           Data.Map as M
+import           Data.List (intercalate)
 
 import qualified Data.List.NonEmpty as E
 

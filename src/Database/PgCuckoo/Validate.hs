@@ -11,19 +11,22 @@ Errors are collected and can then be used for error messages.
 
 {-# LANGUAGE NamedFieldPuns #-}
 
-module Validate ( validatePlannedStmt
-                , validateOperator
-                , validateExpr
-                , isValidPlannedStmt
-                , isValidOperator
-                , isValidExpr ) where
+module Database.PgCuckoo.Validate
+    ( validatePlannedStmt
+    , validateOperator
+    , validateExpr
+    , isValidPlannedStmt
+    , isValidOperator
+    , isValidExpr
+    ) where
 
-import OperSem
-import InAST as I
+import Database.PgCuckoo.OperSem
+import Database.PgCuckoo.InAST as I
 
 import Data.Maybe
 
 import qualified Text.Show.Pretty as PP
+
 
 data Log = Log { errors :: [ String ] }
 

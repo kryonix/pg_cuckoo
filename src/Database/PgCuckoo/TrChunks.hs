@@ -6,13 +6,13 @@ License     : AllRightsReserved
 Maintainer  : Denis Hirn
 -}
 
-module TrChunks ( translate ) where
+module Database.PgCuckoo.TrChunks ( translate ) where
 
 import Data.Maybe
 import Text.Show.Pretty hiding (List, Value, Float)
 import qualified Data.Map as M
-import Reader as R
-import PgPlan as O
+import Database.PgCuckoo.Reader as R
+import Database.PgCuckoo.PgPlan as O
 
 (!) :: (Show a, Ord a) => M.Map a b -> a -> b
 fs ! key = fromMaybe

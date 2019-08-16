@@ -8,16 +8,17 @@ Maintainer  : Denis Hirn
 This is the place where magic happens ¯\_(ツ)_/¯
 -}
 
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE DeriveAnyClass #-}
-{-# LANGUAGE TypeOperators, 
-             FlexibleContexts, 
-             FlexibleInstances, 
-             DefaultSignatures #-}
+{-# LANGUAGE DeriveGeneric     #-}
+{-# LANGUAGE DeriveAnyClass    #-}
+{-# LANGUAGE TypeOperators     #-}
+{-# LANGUAGE FlexibleContexts  #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE DefaultSignatures #-}
 
-module GPrint ( GPrint(..)
-              , GPrint1(..)
-              ) where
+module Database.PgCuckoo.GPrint
+    ( GPrint(..)
+    , GPrint1(..)
+    ) where
 
 import GHC.Generics
 import Data.List

@@ -6,28 +6,30 @@ License     : AllRightsReserved
 Maintainer  : Denis Hirn
 -}
 
-module InAST ( PlannedStmt(..)
-             , Operator(..)
-             , TargetEntry(..)
-             , SortEx(..)
-             , MergeEx(..)
-             , SetOpCmd(..)
-             , SetOpStrategy(..)
-             , Expr(..)
-             , JoinType(..)
-             , NestLoopParam(..)
-             , AggSplit(..)
-             , AggStrategy(..)
-             , aggSplitToInt
-             , aggStrategyToInt
-             , aggSPLIT_INITIAL_SERIAL
-             , aggSPLIT_FINAL_DESERIAL
-             , FrameOptions(..)
-             , frameOptionToBits
-             , SublinkType(..)
-             , sublinkToInt
-             , ParamKind(..)
-             , paramKindToInt ) where
+module Database.PgCuckoo.InAST
+    ( PlannedStmt(..)
+    , Operator(..)
+    , TargetEntry(..)
+    , SortEx(..)
+    , MergeEx(..)
+    , SetOpCmd(..)
+    , SetOpStrategy(..)
+    , Expr(..)
+    , JoinType(..)
+    , NestLoopParam(..)
+    , AggSplit(..)
+    , AggStrategy(..)
+    , aggSplitToInt
+    , aggStrategyToInt
+    , aggSPLIT_INITIAL_SERIAL
+    , aggSPLIT_FINAL_DESERIAL
+    , FrameOptions(..)
+    , frameOptionToBits
+    , SublinkType(..)
+    , sublinkToInt
+    , ParamKind(..)
+    , paramKindToInt
+    ) where
 
 data PlannedStmt = PlannedStmt
                     { planTree :: Operator

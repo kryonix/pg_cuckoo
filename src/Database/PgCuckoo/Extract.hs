@@ -7,10 +7,14 @@ Author      : Denis Hirn
 
 {-# LANGUAGE NamedFieldPuns #-}
 
-module Extract ( extract, extractP, Log(..) ) where
+module Database.PgCuckoo.Extract
+    ( extract
+    , extractP
+    , Log(..)
+    ) where
 
-import OperSem
-import InAST as I
+import Database.PgCuckoo.OperSem
+import Database.PgCuckoo.InAST as I
 
 data Log = Log { lgconsts :: [I.Expr]
                , lgTableNames :: [String]

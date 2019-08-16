@@ -1,9 +1,12 @@
-name:                cuckoo
+name:                PgCuckoo
 version:             0.1.0.0
 # license:             BSD3
 author:              "Denis Hirn"
-maintainer:          "denis.hirn@student.uni-tuebingen.de"
-copyright:           "2018 Denis Hirn"
+maintainer:          "Denis Hirn <denis.hirn@uni-tuebingen.de>"
+copyright:           "2018-2019 Denis Hirn"
+github:              kryonix/pg_cuckoo
+stability:           Experimental
+category:            Database
 
 extra-source-files:
 - README.md
@@ -16,6 +19,7 @@ extra-source-files:
 # To avoid duplicated efforts in documentation and dealing with the
 # complications of embedding Haddock markup inside cabal files, it is
 # common to point users to the README.md file.
+synopsis:            PgCuckoo plan decorator for PostgreSQL plan forcing
 description:         Please see the README
 
 dependencies:
@@ -32,8 +36,6 @@ dependencies:
 
 library:
   source-dirs: src
-  other-modules: 
-    - OperSem
 
 executables:
   cuckoo-exe:
@@ -44,7 +46,7 @@ executables:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
-    - cuckoo
+    - PgCuckoo
     - ConfigFile
 
 tests:
@@ -56,4 +58,4 @@ tests:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
-    - cuckoo
+    - PgCuckoo

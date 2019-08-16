@@ -6,24 +6,26 @@ License     : AllRightsReserved
 Maintainer  : Denis Hirn
 -}
 
-module Lib
+module Database.PgCuckoo.Lib
     ( parseConst
     , checkAndGenerateStmt
     ) where
 
-import Reader as R
-import TrChunks as T
-import GetTable as Td
-import qualified InAST as I
-import PgPlan as O
-import qualified Validate as V
-import Inference as IF
-import Extract as E
-import GPrint as G
+import           Database.PgCuckoo.Reader    as R
+import           Database.PgCuckoo.TrChunks  as T
+import           Database.PgCuckoo.GetTable  as Td
+import qualified Database.PgCuckoo.InAST     as I
+import           Database.PgCuckoo.PgPlan    as O
+import qualified Database.PgCuckoo.Validate  as V
+import           Database.PgCuckoo.Inference as IF
+import           Database.PgCuckoo.Extract   as E
+import           Database.PgCuckoo.GPrint    as G
+
 import Text.Show.Pretty as PP hiding (List, Value, Float)
 import Debug.Trace
 import Data.List
 import Control.Monad
+
 -- | access list elements safely
 (!!) :: [a] -> Int -> Maybe a
 (!!) lst idx = if idx >= length lst

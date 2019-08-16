@@ -6,20 +6,18 @@ import Data.Either.Utils
 
 import Control.Monad
 
-import Lib as L
-import Validate as V
-
-import Parser
 
 import Text.Show.Pretty as PP hiding (List, Value, Float)
 
-import GetTable
-import qualified InAST as A
-import Inference as I
-import Extract as E
-
-import GPrint
 import Data.List
+
+import           Database.PgCuckoo.Lib as L
+import           Database.PgCuckoo.Validate as V
+import           Database.PgCuckoo.GetTable
+import           Database.PgCuckoo.Inference as I
+import           Database.PgCuckoo.Extract as E
+import           Database.PgCuckoo.GPrint
+import qualified Database.PgCuckoo.InAST as A
 
 const1 :: A.Operator
 const1 = A.RESULT

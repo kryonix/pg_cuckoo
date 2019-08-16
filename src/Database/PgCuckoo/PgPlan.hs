@@ -19,28 +19,29 @@ See: src/postgres/include/nodes/plannodes.h
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE FlexibleContexts, FlexibleInstances #-}
 
-module PgPlan ( Null(..)
-              , PLANNEDSTMT(..)
-              , defaultPlannedStmt
-              , GenericPlan(..)
-              , defaultPlan
-              , Plan(..)
-              , Expr(..)
-              , Seq(..)
-              , TARGETENTRY(..)
-              , RelationList(..)
-              , IndexList(..)
-              , Bitmapset(..)
-              , Alias(..)
-              , PlainList(..)
-              , RangeEx(..)
-              , List(..)
-              , PgBool(..)
-              , SORTGROUPCLAUSE(..)
-              , NestLoopParam(..)
-              ) where
+module Database.PgCuckoo.PgPlan 
+    ( Null(..)
+    , PLANNEDSTMT(..)
+    , defaultPlannedStmt
+    , GenericPlan(..)
+    , defaultPlan
+    , Plan(..)
+    , Expr(..)
+    , Seq(..)
+    , TARGETENTRY(..)
+    , RelationList(..)
+    , IndexList(..)
+    , Bitmapset(..)
+    , Alias(..)
+    , PlainList(..)
+    , RangeEx(..)
+    , List(..)
+    , PgBool(..)
+    , SORTGROUPCLAUSE(..)
+    , NestLoopParam(..)
+    ) where
 
-import GPrint
+import Database.PgCuckoo.GPrint
 import GHC.Generics
 import Data.List
 

@@ -8,15 +8,16 @@ Maintainer  : Denis Hirn
 
 {-# LANGUAGE FlexibleContexts #-}
 
-module GetTable( getTable
-               , getTableData
-               , findRow
-               , fromSql
-               , checkPlugin
-               , Table
-               , Row
-               , TableData(..)
-               ) where
+module Database.PgCuckoo.GetTable
+    ( getTable
+    , getTableData
+    , findRow
+    , fromSql
+    , checkPlugin
+    , Table
+    , Row
+    , TableData(..)
+    ) where
 
 import Data.Convertible
 import Database.HDBC

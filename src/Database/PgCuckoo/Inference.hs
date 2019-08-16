@@ -8,23 +8,23 @@ Maintainer  : Denis Hirn
 
 {-# LANGUAGE NamedFieldPuns #-}
 
-module Inference ( generatePlan ) where
+module Database.PgCuckoo.Inference ( generatePlan ) where
 
-import OperSem
+import           Database.PgCuckoo.OperSem
+import           Database.PgCuckoo.GetTable as Tbl
+import qualified Database.PgCuckoo.InAST    as I
+import qualified Database.PgCuckoo.PgPlan   as O
+
 import qualified Text.Show.Pretty as PP
 import qualified Data.Map as M
-import Data.List
+import           Data.List
 
-import GetTable as Tbl
-import Data.Convertible.Base
+import           Data.Convertible.Base
 import qualified Database.HDBC as DB
 import qualified Text.Read as TR
 import           Data.Maybe
 
-import qualified InAST as I
-import qualified PgPlan as O
-
-import Debug.Trace
+import           Debug.Trace
 --------------------------------------------------------------------------------
 -- Exported functions
 
