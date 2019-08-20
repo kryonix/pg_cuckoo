@@ -7,9 +7,11 @@ Maintainer  : Denis Hirn
 
 
 The defined data types relate 1:1 to postgres plan nodes.
-See: src/postgres/include/nodes/plannodes.h
-     src/postgres/include/nodes/parsenodes.h
-     src/postgres/include/nodes/primnodes.h
+See:
+
+  * src\/postgres\/include\/nodes\/plannodes.h
+  * src\/postgres\/include\/nodes\/parsenodes.h
+  * src\/postgres\/include\/nodes\/primnodes.h
 -}
 
 {-# OPTIONS_GHC -fno-warn-unused-matches #-}
@@ -213,7 +215,8 @@ defaultPlan = GenericPlan
               , allParam=Bitmapset [] }
 
 -- | Plan operators
-{-| Result node -
+data Plan =
+  {-| Result node -
       If no outer plan, evaluate a variable-free targetlist.
       If outer plan, return tuples from outer plan (after a level of
       projection as shown by targetlist).
@@ -221,8 +224,8 @@ defaultPlan = GenericPlan
       If resconstantqual isn't NULL, it represents a one-time qualification
       test (i.e., one that doesn't depend on any variables from the outer plan,
       so needs to be evaluated only once).
--}
-data Plan = RESULT
+  -}
+            RESULT
             { genericPlan     :: GenericPlan
             , resconstantqual :: Maybe Expr }
         {-| ProjectSet node -
