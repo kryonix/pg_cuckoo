@@ -89,7 +89,7 @@ checkAndGenerateStmt authStr op = do
     let infered = generatePlan tableDataR consts' (lgTableNames consts) (lgScan consts) op
     let pgplan = gprint infered
     -- putStrLn $ "Explain: "
-    let s1 = "select _pq_plan_explain('" ++ pgplan ++ "', true);"
+    let s1 = "select plan_explain('" ++ pgplan ++ "', true);"
     -- putStrLn $ "Execute:"
-    let s2 = "select _pq_plan_deserialize('" ++ pgplan ++ "');"
+    let s2 = "select plan_execute('" ++ pgplan ++ "');"
     return (infered, s1, s2)
