@@ -2,6 +2,7 @@
 Module      : OperSem
 Description : Operational Semantics Monad
 Copyright   : (c) Torsten Grust, 2014
+                  Denis Hirn, 2019
 License     : AllRightsReserved
 Maintainer  : Denis Hirn <denis.hirn@uni-tuebingen.de>
 Stability   : stable
@@ -23,10 +24,10 @@ import Control.Monad.State  as Monads
 
 -- |A monad for operational semantics (provides log to trace rule application)
 --
--- s: state (e.g., Dewey code supply)
--- e: environment (e.g., let/for variable bindings)
--- a: inferred semantic object
--- l: logged information
+-- * s: state (e.g., Dewey code supply)
+-- * e: environment (e.g., let/for variable bindings)
+-- * a: inferred semantic object
+-- * l: logged information
 type OperSem s e a l = ExceptT String (WriterT l (StateT s (Reader e))) a
 
 -- |Run operational semantics

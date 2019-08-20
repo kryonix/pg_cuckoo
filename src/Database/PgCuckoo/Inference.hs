@@ -1270,7 +1270,7 @@ trOperator s@(I.CTESCAN {I.targetlist, I.qual, I.ctename, I.recursive, I.initPla
                   O.defaultPlan
                     { O.targetlist = O.List targetlist'
                     , O.initPlan   = O.List subplans'
-                    , O.allParam   = O.Bitmapset [p] -- $ if null initPlan then [] else [0..fromIntegral (length initPlan)]
+                    , O.allParam   = O.Bitmapset [p]
                     }
               , O.scanrelid = relid
               , O.ctePlanId = head initPlan

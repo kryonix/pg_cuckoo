@@ -1,8 +1,9 @@
 {-|
 Module      : Extract
-Description : Extracts nodes from the input AST
-Author      : Denis Hirn
-
+Description : Extract information from 'InAST' nodes
+Copyright   : © Denis Hirn, 2019
+License     : AllRightsReserved
+Maintainer  : Denis Hirn <denis.hirn@uni-tuebingen.de>
 -}
 
 {-# LANGUAGE NamedFieldPuns #-}
@@ -16,9 +17,9 @@ module Database.PgCuckoo.Extract
 import Database.PgCuckoo.OperSem
 import Database.PgCuckoo.InAST as I
 
-data Log = Log { lgconsts :: [I.Expr]
-               , lgTableNames :: [String]
-               , lgScan :: [I.Operator]
+data Log = Log { lgconsts :: [I.Expr]     -- ^ list of all 'CONST' nodes in the AST
+               , lgTableNames :: [String] -- ^ all table names
+               , lgScan :: [I.Operator]   -- ^ list of all SCAN operations
                }
   deriving(Show)
 
@@ -39,13 +40,13 @@ logScan scan = tell (Log [] [] [scan])
 
 type Rule a b = a -> OperSem () () b Log
 
--- | Extracts nodes
+-- | Extracts information from a 'PlannedStmt'
 extractP :: I.PlannedStmt -> Log
 extractP op = let
               (_, lg) = runOperSem ((+>) op) () ()
               in lg
 
--- | Extracts nodes
+-- | Extracts information from an 'Operator'
 extract :: I.Operator -> Log
 extract op = let
               (_, lg) = runOperSem ((~>) op) () ()
