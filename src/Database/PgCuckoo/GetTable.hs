@@ -55,21 +55,21 @@ tableToMap rows = map rowToMap rows
 -- | Fetch tables from DB
 getTableData :: String -> IO TableData
 getTableData auth = do
-    pg_operators <- getTable auth "SELECT oid, oprname, oprleft, oprright, oprresult, oprcode FROM pg_operator"
-    pg_type      <- getTable auth "SELECT oid, typname, typcategory, typelem, typrelid, typcollation FROM pg_type"
-    pg_proc      <- getTable auth "SELECT oid, proname, proargtypes, prorettype, proretset, array_to_string(proallargtypes , ' ') as proallargtypes, array_to_string(proargmodes, ' ') as proargmodes, array_to_string(proargnames, ' ') as proargnames, provariadic=0 as provariadic, pronargs, proisagg FROM pg_proc"
-    pg_class     <- getTable auth "SELECT oid, relname, relkind FROM pg_class"
-    pg_attribute <- getTable auth "SELECT attrelid, attnum, atttypid, attname, attlen, atttypmod, attcollation FROM pg_attribute WHERE attnum > 0"
-    pg_aggregate <- getTable auth "SELECT aggfnoid :: OID as oid, * FROM pg_aggregate"
-    pg_indexes   <- getTable auth "SELECT * FROM pg_indexes"
+    data_pg_operators <- getTable auth "SELECT oid, oprname, oprleft, oprright, oprresult, oprcode FROM pg_operator"
+    data_pg_type      <- getTable auth "SELECT oid, typname, typcategory, typelem, typrelid, typcollation FROM pg_type"
+    data_pg_proc      <- getTable auth "SELECT oid, proname, proargtypes, prorettype, proretset, array_to_string(proallargtypes , ' ') as proallargtypes, array_to_string(proargmodes, ' ') as proargmodes, array_to_string(proargnames, ' ') as proargnames, provariadic=0 as provariadic, pronargs, proisagg FROM pg_proc"
+    data_pg_class     <- getTable auth "SELECT oid, relname, relkind FROM pg_class"
+    data_pg_attribute <- getTable auth "SELECT attrelid, attnum, atttypid, attname, attlen, atttypmod, attcollation FROM pg_attribute WHERE attnum > 0"
+    data_pg_aggregate <- getTable auth "SELECT aggfnoid :: OID as oid, * FROM pg_aggregate"
+    data_pg_indexes   <- getTable auth "SELECT * FROM pg_indexes"
 
-    let tOperators = tableToMap pg_operators
-    let tType      = tableToMap pg_type
-    let tProc      = tableToMap pg_proc
-    let tClass     = tableToMap pg_class
-    let tAttribute = tableToMap pg_attribute
-    let tAggregate = tableToMap pg_aggregate
-    let tIndexes   = tableToMap pg_indexes
+    let tOperators = tableToMap data_pg_operators
+    let tType      = tableToMap data_pg_type
+    let tProc      = tableToMap data_pg_proc
+    let tClass     = tableToMap data_pg_class
+    let tAttribute = tableToMap data_pg_attribute
+    let tAggregate = tableToMap data_pg_aggregate
+    let tIndexes   = tableToMap data_pg_indexes
     return $! TableData tOperators tType tProc tClass tAttribute tAggregate tIndexes
 
 checkPlugin :: String -> String -> IO (Either String ())
