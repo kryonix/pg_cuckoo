@@ -38,7 +38,7 @@ import qualified Data.List.NonEmpty as E
 -- the old data-type-definition. This way we can dump the Log back to PG-Notation
 -- preserving the order and utilize Data.Map.
 
-pattern Chunk _chunkName _fields = ChunkOrdering { _chunkName=_chunkName
+pattern Chunk _chunkName _fields <- ChunkOrdering { _chunkName=_chunkName
                                                  , _fields=_fields
                                                  }
 
