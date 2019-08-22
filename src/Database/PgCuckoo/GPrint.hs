@@ -8,8 +8,6 @@ Maintainer  : Denis Hirn
 This is the place where magic happens ¯\_(ツ)_/¯
 -}
 
-{-# LANGUAGE DeriveGeneric     #-}
-{-# LANGUAGE DeriveAnyClass    #-}
 {-# LANGUAGE TypeOperators     #-}
 {-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE FlexibleInstances #-}
