@@ -19,7 +19,7 @@ extra-source-files:
 # To avoid duplicated efforts in documentation and dealing with the
 # complications of embedding Haddock markup inside cabal files, it is
 # common to point users to the README.md file.
-synopsis:            PgCuckoo plan decorator for PostgreSQL plan forcing
+synopsis:            PgCuckoo Plan Decorator for PostgreSQL Plan Forcing
 description:         Please see the README
 
 dependencies:
