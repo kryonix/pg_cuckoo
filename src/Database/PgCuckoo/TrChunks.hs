@@ -6,13 +6,16 @@ License     : AllRightsReserved
 Maintainer  : Denis Hirn
 -}
 
+{-# LANGUAGE RecordWildCards #-}
+
 module Database.PgCuckoo.TrChunks ( translate ) where
 
-import Data.Maybe
-import Text.Show.Pretty hiding (List, Value, Float)
 import qualified Data.Map as M
-import Database.PgCuckoo.Reader as R
+import Data.Maybe
 import Database.PgCuckoo.PgPlan as O
+import Database.PgCuckoo.Reader as R
+import Text.Show.Pretty hiding (Float, List, Value)
+
 
 (!) :: (Show a, Ord a) => M.Map a b -> a -> b
 fs ! key = fromMaybe
@@ -20,25 +23,20 @@ fs ! key = fromMaybe
             (M.lookup key fs)
 
 translate :: Chunk -> O.Expr
-translate (Chunk "CONST" fs) 
-        = O.CONST { consttype=consttype
-                  , consttypmod=consttypmod
-                  , constcollid=constcollid
-                  , constlen=constlen
-                  , constbyval=PgBool constbyval
-                  , constisnull=PgBool constisnull
-                  , location= -1
-                  , constvalue=constvalue
-                  }
-    where
-        (Int consttype) = fs ! "consttype"
-        (Int consttypmod) = fs ! "consttypmod"
-        (Int constcollid) = fs ! "constcollid"
-        (Int constlen)    = fs ! "constlen"
-        (Bool constbyval) = fs ! "constbyval"
-        (Bool constisnull) = fs ! "constisnull"
-        constvalue = case fs ! "constvalue" of
-                        (Extra (Int l) (Sequence constvalue')) -> Just $ Seq l constvalue'
-                        NoValue -> Nothing
+translate (Chunk "CONST" fs) = O.CONST {..}
+  where
+    (Int consttype) = fs ! "consttype"
+    (Int consttypmod) = fs ! "consttypmod"
+    (Int constcollid) = fs ! "constcollid"
+    (Int constlen) = fs ! "constlen"
+    (Bool constbyval') = fs ! "constbyval"
+    (Bool constisnull') = fs ! "constisnull"
+    location = -1
+    constbyval = PgBool constbyval'
+    constisnull = PgBool constisnull'
+    constvalue =
+      case fs ! "constvalue" of
+        (Extra (Int l) (Sequence constvalue')) -> Just $ Seq l constvalue'
+        NoValue -> Nothing
 
 translate err = error $ "Not implemented: " ++ ppShow err
