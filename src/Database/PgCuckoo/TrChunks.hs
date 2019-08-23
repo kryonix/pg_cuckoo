@@ -32,8 +32,8 @@ translate (Chunk "CONST" fs) = O.CONST {..}
     (Bool constbyval') = fs ! "constbyval"
     (Bool constisnull') = fs ! "constisnull"
     location = -1
-    constbyval = PgBool constbyval'
-    constisnull = PgBool constisnull'
+    constbyval = pgConvert constbyval'
+    constisnull = pgConvert constisnull'
     constvalue =
       case fs ! "constvalue" of
         (Extra (Int l) (Sequence constvalue')) -> Just $ Seq l constvalue'

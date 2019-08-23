@@ -20,6 +20,7 @@ See:
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE FlexibleContexts, FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 
 module Database.PgCuckoo.PgPlan 
     ( Null(..)
@@ -43,6 +44,7 @@ module Database.PgCuckoo.PgPlan
     , PgBool(..)
     , SORTGROUPCLAUSE(..)
     , NestLoopParam(..)
+    , PgConvert(..)
     ) where
 
 import Database.PgCuckoo.GPrint
@@ -60,7 +62,7 @@ data Null = Null
 data List a = List [a]
     deriving (Eq, Show)
 
-data PgBool = PgBool Bool
+data PgBool = PgTrue | PgFalse
     deriving (Eq, Show)
 
 data RelationList = RelationList [Integer]
@@ -81,12 +83,31 @@ data Seq = Seq
             , seqvalues :: [Integer] }
     deriving (Eq, Show)
 
+class PgConvert a b where
+  pgConvert :: a -> b
 
-pgFalse :: PgBool
-pgFalse = PgBool False
+instance PgConvert a a where
+  pgConvert = id
 
-pgTrue :: PgBool
-pgTrue = PgBool True
+instance PgConvert Bool PgBool where
+  pgConvert True = PgTrue
+  pgConvert False = PgFalse
+
+instance PgConvert [a] (List a) where
+  pgConvert xs = List xs
+
+instance PgConvert [Integer] RelationList where
+  pgConvert xs = RelationList xs
+
+instance PgConvert [Integer] Bitmapset where
+  pgConvert xs = Bitmapset xs
+
+instance PgConvert [a] (PlainList a) where
+  pgConvert xs = PlainList xs
+
+instance PgConvert [Integer] IndexList where
+  pgConvert xs = IndexList xs
+
 -- / BASE DATA TYPES
 --------------------------------------------------------------------------------
 -- GPrint instances for base types
@@ -112,7 +133,8 @@ instance GPrint IndexList where
   gprint (IndexList xs) = "(i " ++ (intercalate " " $ map gprint xs) ++ ")"
 
 instance GPrint PgBool where
-  gprint (PgBool x) = gprint x
+  gprint PgTrue  = gprint True
+  gprint PgFalse = gprint False
 
 instance GPrint Null where
   gprint Null = "<>"
@@ -158,12 +180,12 @@ defaultPlannedStmt :: PLANNEDSTMT
 defaultPlannedStmt = PLANNEDSTMT
                       { commandType=1
                       , queryId=0
-                      , hasReturning=pgFalse
-                      , hasModifyingCTE=pgFalse
-                      , canSetTag=pgTrue
-                      , transientPlan=pgFalse
-                      , dependsOnRole=pgFalse
-                      , parallelModeNeeded=pgFalse
+                      , hasReturning=PgFalse
+                      , hasModifyingCTE=PgFalse
+                      , canSetTag=PgTrue
+                      , transientPlan=PgFalse
+                      , dependsOnRole=PgFalse
+                      , parallelModeNeeded=PgFalse
                       , planTree=RESULT defaultPlan Nothing
                       , rtable=List []
                       , resultRelations=Null
@@ -205,8 +227,8 @@ defaultPlan = GenericPlan
               , total_cost=0.0
               , plan_rows=0
               , plan_width=0
-              , parallel_aware=pgFalse
-              , parallel_safe=pgFalse
+              , parallel_aware=PgFalse
+              , parallel_safe=PgFalse
               , plan_node_id=0
               , targetlist=List []
               , qual=List []

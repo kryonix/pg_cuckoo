@@ -171,7 +171,7 @@ trPlannedStmt (I.PlannedStmt op subplan) tbls valuesScan = do
   let rte    = map pgTableToRTE tables
   let values = map scanToRTE valuesScan
 
-  let rtable = O.List $ rte ++ values
+  let rtable = O.pgConvert $ rte ++ values
 
   -- We have to do some bookkeeping about the parameter count,
   -- otherwise postgres crashes.
@@ -179,13 +179,14 @@ trPlannedStmt (I.PlannedStmt op subplan) tbls valuesScan = do
 
   parallelMode <- fetchParallelMode ()
 
-  return $ O.defaultPlannedStmt 
-            { O.planTree = res
-            , O.rtable=rtable
-            , O.subplans= O.List subplan''
-            , O.nParamExec = params
-            , O.parallelModeNeeded = O.PgBool parallelMode
-            }
+  return $
+    O.defaultPlannedStmt
+      { O.planTree = res
+      , O.rtable = rtable
+      , O.subplans = O.pgConvert subplan''
+      , O.nParamExec = params
+      , O.parallelModeNeeded = O.pgConvert parallelMode
+      }
 
 defaultRangeExGenericPre :: O.GenericRangeExPre
 defaultRangeExGenericPre =
@@ -198,9 +199,9 @@ defaultRangeExGenericPre =
 defaultRangeExGenericPost :: O.GenericRangeExPost
 defaultRangeExGenericPost =
   O.GenericRangeExPost
-    { O.lateral = O.PgBool False
-    , O.inh = O.PgBool False
-    , O.inFromCl = O.PgBool False
+    { O.lateral = O.PgFalse
+    , O.inh = O.PgFalse
+    , O.inFromCl = O.PgFalse
     , O.requiredPerms = 2
     , O.checkAsUser = 0
     , O.selectedCols = O.Bitmapset []
@@ -222,7 +223,7 @@ pgTableToRTE t =
   where
     collids = map cAttnum $ tCols t
     selectedCols = O.Bitmapset collids
-    inFromCl = O.PgBool True
+    inFromCl = O.PgTrue
     colnames = map cAttname $ tCols t
     eref = O.Alias {O.aliasname = tName t, O.colnames = O.List colnames}
     oid = tOID t
@@ -233,7 +234,7 @@ scanToRTE (I.SUBQUERYSCAN {I.targetlist}) =
   O.RTE_SUBQUERY
     { O.genericRangeExPre = defaultRangeExGenericPre {O.eref, O.rtekind = 1}
     , O.subquery = O.Null
-    , O.security_barrier = O.PgBool False
+    , O.security_barrier = O.PgFalse
     , O.genericRangeExPost = defaultRangeExGenericPost {O.requiredPerms = 0}
     }
   where
@@ -241,14 +242,14 @@ scanToRTE (I.SUBQUERYSCAN {I.targetlist}) =
     eref =
       O.Alias
         { O.aliasname = "SUBQUERY"
-        , O.colnames = O.List $ ["column" ++ show x | x <- [1 .. colnum]]
+        , O.colnames = O.pgConvert ["column" ++ show x | x <- [1 .. colnum]]
         }
 
 scanToRTE (I.WORKTABLESCAN {I.targetlist}) =
   O.RTE_SUBQUERY
     { O.genericRangeExPre = defaultRangeExGenericPre {O.eref, O.rtekind = 1}
     , O.subquery = O.Null
-    , O.security_barrier = O.PgBool False
+    , O.security_barrier = O.PgFalse
     , O.genericRangeExPost = defaultRangeExGenericPost {O.requiredPerms = 0}
     }
   where
@@ -267,7 +268,7 @@ scanToRTE (I.VALUESSCAN {I.targetlist}) =
     , O.coltypmods = O.Null
     , O.colcollations = O.Null
     , O.genericRangeExPost =
-        defaultRangeExGenericPost {O.inFromCl = O.PgBool True}
+        defaultRangeExGenericPost {O.inFromCl = O.PgTrue}
     }
   where
     colnum = length $ targetlist
@@ -282,12 +283,12 @@ scanToRTE (I.CTESCAN {I.targetlist, I.qual, I.ctename, I.recursive}) =
     { O.genericRangeExPre = defaultRangeExGenericPre {O.eref, O.rtekind = 6}
     , O.ctename = ctename
     , O.ctelevelsup = 0
-    , O.self_reference = O.PgBool recursive
+    , O.self_reference = O.pgConvert recursive
     , O.coltypes = O.Null
     , O.coltypmods = O.Null
     , O.colcollations = O.Null
     , O.genericRangeExPost =
-        defaultRangeExGenericPost {O.inFromCl = O.PgBool True}
+        defaultRangeExGenericPost {O.inFromCl = O.PgTrue}
     }
   where
     colnum = length $ targetlist
@@ -299,7 +300,7 @@ scanToRTE (I.FUNCTIONSCAN {I.targetlist, I.funcordinality}) =
   O.RTE_FUNCTIONS
     { O.genericRangeExPre = defaultRangeExGenericPre {O.eref, O.rtekind = 3}
     , O._functions = O.Null
-    , O._funcordinality = O.PgBool funcordinality
+    , O._funcordinality = O.pgConvert funcordinality
     , O.genericRangeExPost = defaultRangeExGenericPost
     }
   where
@@ -411,7 +412,7 @@ trOperator n@(I.SORT { I.targetlist, I.operator, I.sortCols })
     when (length targetlist' < numCols)
       $ error $ "SORT: more sortCols than targetlist entries defined."
 
-    let nullsFirst = O.PlainList $ map (O.PgBool . I.sortNullsFirst) sortCols
+    let nullsFirst = O.PlainList $ map (O.pgConvert . I.sortNullsFirst) sortCols
 
     opnos <- mapM (trSortEx targetlist') sortCols
 
@@ -512,7 +513,7 @@ trOperator (I.MERGEAPPEND { I.targetlist, I.mergeplans, I.sortCols })
     when (length targetlist' < numCols)
       $ error $ "SORT: more sortCols than targetlist entries defined."
 
-    let nullsFirst = O.PlainList $ map (O.PgBool . I.sortNullsFirst) sortCols
+    let nullsFirst = O.PlainList $ map (O.pgConvert . I.sortNullsFirst) sortCols
 
     opnos <- mapM (trSortEx targetlist') sortCols
 
@@ -616,7 +617,7 @@ trOperator (I.BITMAPOR { I.bitmapplans })
 
     return $ O.BITMAPOR
               { O.genericPlan = O.defaultPlan
-              , O.isshared    = O.PgBool False
+              , O.isshared    = O.PgFalse
               , O.bitmapplans = O.List bitmapplans'
               }
 
@@ -699,7 +700,7 @@ trOperator (I.INDEXONLYSCAN {I.targetlist, I.qual, I.indexqual, I.indexorderby, 
                       , O.ressortgroupref = 0
                       , O.resorigtbl = 0
                       , O.resorigcol = 0
-                      , O.resjunk = O.PgBool False }
+                      , O.resjunk = O.PgFalse }
                     | (n, e) <- indexColumns
                     ]
 
@@ -740,7 +741,7 @@ trOperator (I.BITMAPINDEXSCAN {I.indexqual, I.indexname, I.scanrelation})
             { O.genericPlan = O.defaultPlan
             , O.scanrelid = index'
             , O.indexid   = tOID tbl
-            , O.isshared  = O.PgBool False
+            , O.isshared  = O.PgFalse
             , O.indexqual = O.List indexqual'
             , O.indexqualorig = O.Null
             }
@@ -899,7 +900,7 @@ trOperator (I.MATERIAL {I.operator})
                                         , O.ressortgroupref = 0
                                         , O.resorigtbl = 0
                                         , O.resorigcol = 0
-                                        , O.resjunk = O.PgBool False
+                                        , O.resjunk = O.PgFalse
                                         } ) genPlan
 
     return $ O.MATERIAL
@@ -956,7 +957,7 @@ trOperator (I.NESTLOOP {I.targetlist, I.joinType, I.inner_unique, I.joinquals, I
                                   -- , O.allParam = O.Bitmapset paramNums
                                   }
               , O.jointype = joinType'
-              , O.inner_unique = O.PgBool inner_unique
+              , O.inner_unique = O.pgConvert inner_unique
               , O.joinquals = O.List joinquals'
               , O.nestParams = O.List nlparams'
               }
@@ -990,7 +991,7 @@ trOperator (I.MERGEJOIN {I.targetlist, I.qual, I.joinType, I.inner_unique, I.joi
                       I.ANTI  -> 5
     
     let mergeStrategies' = map (\x -> if I.mergeASC x then 1 else -1) mergeStrategies
-    let mergeNullsFirst  = map (O.PgBool . I.mergeNullsFirst) mergeStrategies
+    let mergeNullsFirst  = map (O.pgConvert . I.mergeNullsFirst) mergeStrategies
     mergeCollations      <- mapM getExprCollation mergeclauses'
     let mergeFamilies    = replicate (length mergeclauses) 0
     return $ O.MERGEJOIN
@@ -1001,9 +1002,9 @@ trOperator (I.MERGEJOIN {I.targetlist, I.qual, I.joinType, I.inner_unique, I.joi
                                   , O.righttree = Just righttree'
                                   }
               , O.jointype = joinType'
-              , O.inner_unique = O.PgBool inner_unique
+              , O.inner_unique = O.pgConvert inner_unique
               , O.joinquals = O.List joinquals'
-              , O.skip_mark_restore = O.PgBool True
+              , O.skip_mark_restore = O.PgTrue
               , O.mergeclauses = O.List mergeclauses'
               , O.mergeFamilies = O.PlainList mergeFamilies
               , O.mergeCollations = O.PlainList mergeCollations
@@ -1063,7 +1064,7 @@ trOperator s@(I.SUBQUERYSCAN {I.targetlist, I.qual, I.subplan})
                                       , O.ressortgroupref = n
                                       , O.resorigcol = 0
                                       , O.resorigtbl = 0
-                                      , O.resjunk = O.PgBool resjunk
+                                      , O.resjunk = O.pgConvert resjunk
                                       })
                     _ -> trTargetEntry (e, n)
 
@@ -1128,7 +1129,7 @@ trOperator t@(I.FUNCTIONSCAN {I.targetlist, I.qual, I.functions, I.funcordinalit
                                       , O.ressortgroupref = n
                                       , O.resorigcol = 0
                                       , O.resorigtbl = 0
-                                      , O.resjunk = O.PgBool resjunk
+                                      , O.resjunk = O.pgConvert resjunk
                                       })
                     _ -> trTargetEntry (e, n)
 
@@ -1142,7 +1143,7 @@ trOperator t@(I.FUNCTIONSCAN {I.targetlist, I.qual, I.functions, I.funcordinalit
                                   , O.qual = O.List qual'}
               , O.scanrelid = relid
               , O.functions = O.List functions''
-              , O.funcordinality = O.PgBool funcordinality
+              , O.funcordinality = O.pgConvert funcordinality
               }
 
 trOperator s@(I.VALUESSCAN {I.targetlist, I.qual, I.values_list})
@@ -1177,7 +1178,7 @@ trOperator s@(I.VALUESSCAN {I.targetlist, I.qual, I.values_list})
                                           , O.ressortgroupref = n
                                           , O.resorigcol = 0
                                           , O.resorigtbl = 0
-                                          , O.resjunk = O.PgBool resjunk
+                                          , O.resjunk = O.pgConvert resjunk
                                           })
                         _ -> trTargetEntry (e, n)
 
@@ -1229,7 +1230,7 @@ trOperator s@(I.CTESCAN {I.targetlist, I.qual, I.ctename, I.recursive, I.initPla
                                           , O.ressortgroupref = n
                                           , O.resorigcol = 0
                                           , O.resorigtbl = 0
-                                          , O.resjunk = O.PgBool resjunk
+                                          , O.resjunk = O.pgConvert resjunk
                                           })
                         _ -> trTargetEntry (e, n)
 
@@ -1281,8 +1282,8 @@ trOperator (I.GATHER {I.targetlist, I.operator, I.num_workers, I.rescan_param})
                   }
               , O.num_workers = num_workers
               , O.rescan_param = rescan_param
-              , O.single_copy = O.PgBool False
-              , O.invisible   = O.PgBool False
+              , O.single_copy = O.PgFalse
+              , O.invisible   = O.PgFalse
               }
 
 trOperator (I.GATHERMERGE {I.targetlist, I.operator, I.num_workers, I.rescan_param, I.sortCols})
@@ -1310,7 +1311,7 @@ trOperator (I.GATHERMERGE {I.targetlist, I.operator, I.num_workers, I.rescan_par
     when (length targetlist' < numCols)
       $ error $ "SORT: more sortCols than targetlist entries defined."
 
-    let nullsFirst = O.PlainList $ map (O.PgBool . I.sortNullsFirst) sortCols
+    let nullsFirst = O.PlainList $ map (O.pgConvert . I.sortNullsFirst) sortCols
 
     opnos <- mapM (trSortEx targetlist') sortCols
 
@@ -1368,7 +1369,7 @@ trOperator s@(I.HASH {I.targetlist, I.operator, I.skewTable, I.skewColumn})
                                 }
               , O.skewTable = oid
               , O.skewColumn = skewColumn
-              , O.skewInherit = O.PgBool False
+              , O.skewInherit = O.PgFalse
               }
 
 trOperator s@(I.HASHJOIN {I.targetlist, I.joinType, I.inner_unique, I.joinquals, I.hashclauses, I.lefttree, I.righttree})
@@ -1405,7 +1406,7 @@ trOperator s@(I.HASHJOIN {I.targetlist, I.joinType, I.inner_unique, I.joinquals,
                                   , O.righttree = Just righttree'
                                   }
               , O.jointype = joinType'
-              , O.inner_unique = O.PgBool inner_unique
+              , O.inner_unique = O.pgConvert inner_unique
               , O.joinqual = O.List joinquals'
               , O.hashclauses = O.List hashclauses'
               }
@@ -1465,8 +1466,8 @@ trOperator (I.PARALLEL {I.operator})
     let operator'' = operator' 
                     { O.genericPlan = 
                       (O.genericPlan operator') 
-                      { O.parallel_aware=O.PgBool True
-                      , O.parallel_safe=O.PgBool True
+                      { O.parallel_aware=O.PgTrue
+                      , O.parallel_safe=O.PgTrue
                       }
                     }
     return operator''
@@ -1521,8 +1522,8 @@ trSortEx targetlist (I.SortEx { I.sortTarget, I.sortASC, I.sortNullsFirst })
                 { O.tleSortGroupRef = sortTarget
                 , O.eqop = eqop
                 , O.sortop = opno
-                , O.nulls_first = O.PgBool sortNullsFirst
-                , O.hashable = O.PgBool hashable }
+                , O.nulls_first = O.pgConvert sortNullsFirst
+                , O.hashable = O.pgConvert hashable }
 
 searchOperator :: Rule (Integer, String) (Integer, Bool)
 searchOperator (typ', op)
@@ -1561,7 +1562,7 @@ trTargetEntry (I.TargetEntry { I.targetexpr, I.targetresname, I.resjunk }, resno
               , O.ressortgroupref = resno -- 0 -- Constant for now
               , O.resorigtbl      = 0
               , O.resorigcol      = 0
-              , O.resjunk         = O.PgBool resjunk
+              , O.resjunk         = O.pgConvert resjunk
               }
 
 
@@ -1584,9 +1585,9 @@ trSubPlan name (n, x) = do
               , O.firstColType      = firstColType
               , O.firstColTypmod    = -1
               , O.firstColCollation = 0
-              , O.useHashTable      = O.PgBool False
-              , O.unknownEqFalse    = O.PgBool False
-              , O._parallel_safe    = O.PgBool False
+              , O.useHashTable      = O.PgFalse
+              , O.unknownEqFalse    = O.PgFalse
+              , O._parallel_safe    = O.PgFalse
               , O.setParam          = O.IndexList []
               , O.parParam          = O.IndexList []
               , O.args            = O.List []
@@ -1708,8 +1709,8 @@ trExpr n@(I.FUNCEXPR { I.funcname, I.funcargs })
     -- Extract all information we need
     let prooid      = fromSql $ head procrow M.! "oid"
     let prorettype  = fromSql $ head procrow M.! "prorettype"
-    let proretset   = fromSql $ head procrow M.! "proretset"
-    let provariadic = fromSql $ head procrow M.! "provariadic"
+    let proretset   = fromSql $ head procrow M.! "proretset" :: Bool
+    let provariadic = fromSql $ head procrow M.! "provariadic" :: Bool
     let pronargs    = fromSql $ head procrow M.! "pronargs"
 
     -- Check if argument count is correct. Error if mismatch
@@ -1749,8 +1750,8 @@ trExpr n@(I.FUNCEXPR { I.funcname, I.funcargs })
     return $ O.FUNCEXPR
               { O.funcid = prooid
               , O.funcresulttype = prorettype
-              , O.funcretset = O.PgBool proretset
-              , O.funcvariadic = O.PgBool provariadic
+              , O.funcretset = O.pgConvert proretset
+              , O.funcvariadic = O.pgConvert provariadic
               , O.funcformat = 0   -- relevant?
               , O.funccollid = 0   -- ignore collations
               , O.inputcollid = 0  -- ignore collations
@@ -1791,7 +1792,7 @@ trExpr n@(I.OPEXPR { I.oprname, I.oprargs })
     -- Extract all information we need
     let prooid      = fromSql $ head procrow M.! "oid"
     let prorettype  = fromSql $ head procrow M.! "prorettype"
-    let proretset   = fromSql $ head procrow M.! "proretset"
+    let proretset   = fromSql $ head procrow M.! "proretset" :: Bool
 
     let opno      = fromSql $ head row M.! "oid"
 
@@ -1799,7 +1800,7 @@ trExpr n@(I.OPEXPR { I.oprname, I.oprargs })
               { O.opno = opno
               , O.opfuncid = prooid
               , O.opresulttype = prorettype
-              , O.opretset = O.PgBool proretset
+              , O.opretset = O.pgConvert proretset
               , O.opcollid = 0  -- Ignore collations
               , O.inputcollid = 0
               , O.args = O.List args'
@@ -1880,8 +1881,8 @@ trExpr n@(I.AGGREF {I.aggname, I.aggargs, I.aggdirectargs, I.aggorder, I.aggdist
             , O.aggorder      = O.List aggorder'
             , O.aggdistinct   = O.List aggdistinct'
             , O.aggfilter     = aggfilter'
-            , O.aggstar       = O.PgBool aggstar
-            , O.aggvariadic   = O.PgBool False
+            , O.aggstar       = O.pgConvert aggstar
+            , O.aggvariadic   = O.PgFalse
             , O.aggkind       = aggkind
             , O.agglevelsup   = 0
             , O._aggsplit     = 0
@@ -1922,7 +1923,7 @@ trExpr n@(I.WINDOWFUNC {I.winname, I.winargs, I.aggfilter, I.winref, I.winstar})
     -- let proretset   = fromSql $ head procrow M.! "proretset"
     -- let provariadic = fromSql $ head procrow M.! "provariadic"
     let pronargs    = fromSql $ head procrow M.! "pronargs"
-    let proisagg    = fromSql $ head procrow M.! "proisagg"
+    let proisagg    = fromSql $ head procrow M.! "proisagg" :: Bool
 
     -- Check if argument count is correct. Error if mismatch
     when (pronargs /= length winargs)
@@ -1951,91 +1952,80 @@ trExpr n@(I.WINDOWFUNC {I.winname, I.winargs, I.aggfilter, I.winref, I.winstar})
               , O.args = O.List args'
               , O.aggfilter = aggfilter'
               , O._winref = winref
-              , O.winstar = O.PgBool winstar
-              , O.winagg  = O.PgBool proisagg
+              , O.winstar = O.pgConvert winstar
+              , O.winagg  = O.pgConvert proisagg
               , O.location = -1
               }
 
-trExpr (I.AND { I.args })
-  = do
-    args' <- mapM trExpr args
-    return $ O.BOOLEXPR
-            { O.boolop   = "and"
-            , O.args     = O.List args'
-            , O.location = -1
-            }
+trExpr (I.AND {I.args}) = do
+  args' <- mapM trExpr args
+  return $ O.BOOLEXPR {O.boolop = "and", O.args = O.pgConvert args', O.location = -1}
 
-trExpr (I.OR { I.args })
-  = do
-    args' <- mapM trExpr args
-    return $ O.BOOLEXPR
-            { O.boolop   = "or"
-            , O.args     = O.List args'
-            , O.location = -1
-            }
+trExpr (I.OR {I.args}) = do
+  args' <- mapM trExpr args
+  return $ O.BOOLEXPR {O.boolop = "or", O.args = O.pgConvert args', O.location = -1}
 
-trExpr (I.NOT { I.arg })
-  = do
-    arg' <- trExpr arg
-    return $ O.BOOLEXPR
-            { O.boolop   = "not"
-            , O.args     = O.List [arg']
-            , O.location = -1
-            }
+trExpr (I.NOT {I.arg}) = do
+  arg' <- trExpr arg
+  return $
+    O.BOOLEXPR {O.boolop = "not", O.args = O.pgConvert [arg'], O.location = -1}
 
-trExpr (I.PARAM { I.paramkind, I.paramid, I.paramtype })
-  = do
+trExpr (I.PARAM {I.paramkind, I.paramid, I.paramtype}) = do
+  row <- getRTableRow (pg_type, findRow "typname" paramtype)
 
-    row <- getRTableRow (pg_type, findRow "typname" paramtype)
+  when (null row) $ error $ "type not found: " ++ show paramtype
 
-    when (null row) $ error $ "type not found: " ++ show paramtype
+  let typid = fromSql $ (\(x:_) -> x) row M.! "oid"
+  let typcollid = fromSql $ (\(x:_) -> x) row M.! "typcollation"
+  return $
+    O.PARAM
+      { O.paramkind = I.paramKindToInt paramkind
+      , O.paramid = paramid
+      , O.paramtype = typid
+      , O.paramtypmod = -1
+      , O.paramcollid = typcollid
+      , O.location = -1
+      }
 
-    let typid = fromSql $ (\(x:_) -> x) row M.! "oid"
-    let typcollid = fromSql $ (\(x:_) -> x) row M.! "typcollation"
+trExpr (I.SUBPLAN { I.sublinkType
+                  , I.testExpr
+                  , I.paramIds
+                  , I.plan_id
+                  , I.plan_name
+                  , I.firstColType
+                  , I.setParam
+                  , I.parParam
+                  , I.args
+                  }) = do
+  testExpr' <- mapM trExpr testExpr
+  args'     <- mapM trExpr args
+  row       <- getRTableRow (pg_type, findRow "typname" firstColType)
 
-    return $ O.PARAM
-              { O.paramkind = I.paramKindToInt paramkind
-              , O.paramid   = paramid
-              , O.paramtype = typid
-              , O.paramtypmod = -1
-              , O.paramcollid = typcollid
-              , O.location    = -1
-              }
+  when (null row) $ error $ "type not found: " ++ show firstColType
 
-trExpr (I.SUBPLAN { I.sublinkType, I.testExpr, I.paramIds, I.plan_id, I.plan_name, I.firstColType, I.setParam, I.parParam, I.args })
-  = do
-    testExpr' <- mapM trExpr testExpr
-    args'     <- mapM trExpr args
-
-    row <- getRTableRow (pg_type, findRow "typname" firstColType)
-
-    when (null row) $ error $ "type not found: " ++ show firstColType
-
-    let typid = fromSql $ (\(x:_) -> x) row M.! "oid"
-    let typcollid = fromSql $ (\(x:_) -> x) row M.! "typcollation"
-
-
-    -- Have to do bookkeeping about the number of params 'generated'
-    incrParam 1
-
-    return $ O.SUBPLAN
-              { O.subLinkType       = I.sublinkToInt sublinkType
-              , O.testexpr          = testExpr'
-              , O.paramIds          = O.List paramIds
-              , O.plan_id           = plan_id
-              , O.plan_name         = plan_name
-              , O.firstColType      = typid
-              , O.firstColTypmod    = typcollid
-              , O.firstColCollation = 0
-              , O.useHashTable      = O.PgBool False
-              , O.unknownEqFalse    = O.PgBool False
-              , O._parallel_safe    = O.PgBool False
-              , O.setParam          = O.IndexList setParam
-              , O.parParam          = O.IndexList parParam
-              , O.args              = O.List args'
-              , O._startup_cost     = 0.0
-              , O.per_call_cost     = 0.0
-              }
+  let typid = fromSql $ (\(x:_) -> x) row M.! "oid"
+  let typcollid = fromSql $ (\(x:_) -> x) row M.! "typcollation"
+  -- Have to do bookkeeping about the number of params 'generated'
+  incrParam 1
+  return $
+    O.SUBPLAN
+      { O.subLinkType = I.sublinkToInt sublinkType
+      , O.testexpr = testExpr'
+      , O.paramIds = O.pgConvert paramIds
+      , O.plan_id = plan_id
+      , O.plan_name = plan_name
+      , O.firstColType = typid
+      , O.firstColTypmod = typcollid
+      , O.firstColCollation = 0
+      , O.useHashTable = O.pgConvert False
+      , O.unknownEqFalse = O.pgConvert False
+      , O._parallel_safe = O.pgConvert False
+      , O.setParam = O.pgConvert setParam
+      , O.parParam = O.pgConvert parParam
+      , O.args = O.pgConvert args'
+      , O._startup_cost = 0.0
+      , O.per_call_cost = 0.0
+      }
 
 trExpr err = error $ "trExpr not implemented: \n" ++ PP.ppShow err
 

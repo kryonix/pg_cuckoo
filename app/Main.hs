@@ -3314,7 +3314,7 @@ checkAndGenerate authStr op = do
   -- putStrLn $ "Explain: "
   writeFile "explain.sql" $ "select plan_explain('" ++ pgplan ++ "', true);"
   -- putStrLn $ "Execute:"
-  writeFile "execute.sql" $ "select plan_execute('" ++ pgplan ++ "');"
+  writeFile "execute.sql" $ "select plan_execute_print('" ++ pgplan ++ "');"
 
 checkAndGenerateStmt :: String -> A.PlannedStmt -> IO ()
 checkAndGenerateStmt authStr op = do
