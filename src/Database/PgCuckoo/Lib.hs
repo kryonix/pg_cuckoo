@@ -91,5 +91,5 @@ checkAndGenerateStmt authStr op = do
     -- putStrLn $ "Explain: "
     let s1 = "select plan_explain('" ++ pgplan ++ "', true);"
     -- putStrLn $ "Execute:"
-    let s2 = "select plan_execute('" ++ pgplan ++ "');"
+    let s2 = "select plan_execute_print('" ++ pgplan ++ "');"
     return (infered, s1, s2)

@@ -3350,7 +3350,7 @@ checkAndGenerateStmt authStr op = do
   -- putStrLn $ "Explain: "
   writeFile "explain.sql" $ "select plan_explain('" ++ pgplan ++ "', true);"
   -- putStrLn $ "Execute:"
-  writeFile "execute.sql" $ "select plan_execute('" ++ pgplan ++ "');"
+  writeFile "execute.sql" $ "select plan_execute_print('" ++ pgplan ++ "');"
 
 
 main :: IO ()
@@ -3364,5 +3364,5 @@ main = do
     let cp = forceEither config
     let authStr = forceEither $ get cp "Main" "dbauth" :: String
 
-    checkAndGenerate authStr agg2
+    checkAndGenerate authStr seq1
     -- Main.checkAndGenerateStmt authStr sigPlan
