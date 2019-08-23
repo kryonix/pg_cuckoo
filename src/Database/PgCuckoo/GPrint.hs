@@ -71,6 +71,8 @@ instance (GPrint1 f, Datatype c) => GPrint1 (M1 D c f) where
 instance (GPrint1 f, Constructor c) => GPrint1 (M1 C c f) where
   gprint1 m@(M1 x) = case conName m of
                         "GenericPlan" -> gprint1 x
+                        "GenericRangeExPre" -> gprint1 x
+                        "GenericRangeExPost" -> gprint1 x
                         c -> "{" ++ takeWhile (/= '_') c ++ " " ++ gprint1 x ++ "}"
 
 -- Selector name, those are gonna be our fields
@@ -80,6 +82,8 @@ instance (GPrint1 f, Selector s) => GPrint1 (M1 S s f) where
       sel = case selName m of
               "" -> ""
               "genericPlan" -> ""
+              "genericRangeExPre" -> ""
+              "genericRangeExPost" -> ""
               e  -> ":" ++ dropWhile (== '_') e ++ " "
 
 instance (GPrint1 a, GPrint1 b) => GPrint1 (a :*: b) where

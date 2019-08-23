@@ -36,6 +36,8 @@ module Database.PgCuckoo.PgPlan
     , Bitmapset(..)
     , Alias(..)
     , PlainList(..)
+    , GenericRangeExPre(..)
+    , GenericRangeExPost(..)
     , RangeEx(..)
     , List(..)
     , PgBool(..)
@@ -457,92 +459,64 @@ data NestLoopParam = NESTLOOPPARAM
                       }
     deriving (Eq, Show, Generic, GPrint)
 
+data GenericRangeExPre
+  = GenericRangeExPre
+    { alias :: Maybe Alias
+    , eref  :: Alias
+    , rtekind :: Integer
+    }
+    deriving(Eq, Show, Generic, GPrint)
+
+data GenericRangeExPost
+  = GenericRangeExPost
+    { lateral       :: PgBool
+    , inh           :: PgBool      -- Const false?
+    , inFromCl      :: PgBool      -- Const true?
+    , requiredPerms :: Integer   -- Const 2?
+    , checkAsUser   :: Integer   -- Const 0?
+    , selectedCols  :: Bitmapset
+    , insertedCols  :: Bitmapset -- Const []
+    , updatedCols   :: Bitmapset -- Const []
+    , securityQuals :: Null
+    }
+    deriving(Eq, Show, Generic, GPrint)
+
 data RangeEx = RTE
-                { alias         :: Maybe Alias
-                , eref          :: Alias
-                , rtekind       :: Integer  -- Const 0
+                { genericRangeExPre :: GenericRangeExPre
                 , relid         :: Integer  -- OID of the relation
                 , relkind       :: String   -- relation kind (see pg_class.relkind)
                 , tablesample   :: Null
-                , lateral       :: PgBool
-                , inh           :: PgBool      -- Const false?
-                , inFromCl      :: PgBool      -- Const true?
-                , requiredPerms :: Integer   -- Const 2?
-                , checkAsUser   :: Integer   -- Const 0?
-                , selectedCols  :: Bitmapset
-                , insertedCols  :: Bitmapset -- Const []
-                , updatedCols   :: Bitmapset -- Const []
-                , securityQuals :: Null
+                , genericRangeExPost :: GenericRangeExPost
                 }
              | RTE_SUBQUERY
-                { alias            :: Maybe Alias
-                , eref             :: Alias
-                , rtekind          :: Integer
+                { genericRangeExPre :: GenericRangeExPre
                 , subquery         :: Null
                 , security_barrier :: PgBool
-                , lateral          :: PgBool
-                , inh              :: PgBool
-                , inFromCl         :: PgBool
-                , requiredPerms    :: Integer
-                , checkAsUser      :: Integer
-                , selectedCols     :: Bitmapset
-                , insertedCols     :: Bitmapset
-                , updatedCols      :: Bitmapset
-                , securityQuals    :: Null
+                , genericRangeExPost :: GenericRangeExPost
                 }
              | RTE_VALUES
-                { alias         :: Maybe Alias
-                , eref          :: Alias
-                , rtekind       :: Integer
+                { genericRangeExPre :: GenericRangeExPre
                 , values_lists  :: Null
                 , coltypes      :: Null
                 , coltypmods    :: Null
                 , colcollations :: Null
-                , lateral       :: PgBool
-                , inh           :: PgBool
-                , inFromCl      :: PgBool
-                , requiredPerms :: Integer
-                , checkAsUser   :: Integer
-                , selectedCols  :: Bitmapset
-                , insertedCols  :: Bitmapset
-                , updatedCols   :: Bitmapset
-                , securityQuals :: Null
+                , genericRangeExPost :: GenericRangeExPost
                 }
              | RTE_CTE
-                { alias          :: Maybe Alias
-                , eref           :: Alias
-                , rtekind        :: Integer
+                { genericRangeExPre :: GenericRangeExPre
                 , ctename        :: String
                 , ctelevelsup    :: Integer
                 , self_reference :: PgBool
                 , coltypes       :: Null
                 , coltypmods     :: Null
                 , colcollations  :: Null
-                , lateral        :: PgBool
-                , inh            :: PgBool
-                , inFromCl       :: PgBool
-                , requiredPerms  :: Integer
-                , checkAsUser    :: Integer
-                , selectedCols   :: Bitmapset
-                , insertedCols   :: Bitmapset
-                , updatedCols    :: Bitmapset
-                , securityQuals  :: Null
+                , genericRangeExPost :: GenericRangeExPost
                 }
              | RTE_FUNCTIONS
-                { alias           :: Maybe Alias
-                , eref            :: Alias
-                , rtekind         :: Integer
+                { genericRangeExPre :: GenericRangeExPre
                 , _functions      :: Null
                 , _funcordinality :: PgBool
-                , lateral         :: PgBool
-                , inh             :: PgBool
-                , inFromCl        :: PgBool
-                , requiredPerms   :: Integer
-                , checkAsUser     :: Integer
-                , selectedCols    :: Bitmapset
-                , insertedCols    :: Bitmapset
-                , updatedCols     :: Bitmapset
-                , securityQuals   :: Null
+                , genericRangeExPost :: GenericRangeExPost
                 }
     deriving (Eq, Show, Generic, GPrint)
 

@@ -7,6 +7,7 @@ Maintainer  : Denis Hirn
 -}
 
 {-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module Database.PgCuckoo.Inference ( generatePlan ) where
 
@@ -186,154 +187,129 @@ trPlannedStmt (I.PlannedStmt op subplan) tbls valuesScan = do
             , O.parallelModeNeeded = O.PgBool parallelMode
             }
 
+defaultRangeExGenericPre :: O.GenericRangeExPre
+defaultRangeExGenericPre =
+  O.GenericRangeExPre
+    { O.alias = Nothing
+    , O.eref = O.Alias {O.aliasname = "", O.colnames = O.List []}
+    , O.rtekind = -1
+    }
+
+defaultRangeExGenericPost :: O.GenericRangeExPost
+defaultRangeExGenericPost =
+  O.GenericRangeExPost
+    { O.lateral = O.PgBool False
+    , O.inh = O.PgBool False
+    , O.inFromCl = O.PgBool False
+    , O.requiredPerms = 2
+    , O.checkAsUser = 0
+    , O.selectedCols = O.Bitmapset []
+    , O.insertedCols = O.Bitmapset []
+    , O.updatedCols = O.Bitmapset []
+    , O.securityQuals = O.Null
+    }
+
 pgTableToRTE :: PgTable -> O.RangeEx
-pgTableToRTE t = O.RTE
-                  { O.alias         = Nothing
-                  , O.eref          = erefA
-                  , O.rtekind       = 0
-                  , O.relid         = oid
-                  , O.relkind       = relkind
-                  , O.tablesample   = O.Null
-                  , O.lateral       = O.PgBool False
-                  , O.inh           = O.PgBool False
-                  , O.inFromCl      = O.PgBool True
-                  , O.requiredPerms = 2
-                  , O.checkAsUser   = 0
-                  , O.selectedCols  = O.Bitmapset collids
-                  , O.insertedCols  = O.Bitmapset []
-                  , O.updatedCols   = O.Bitmapset []
-                  , O.securityQuals = O.Null
-                  }
+pgTableToRTE t =
+  O.RTE
+    { O.genericRangeExPre = defaultRangeExGenericPre {O.eref, O.rtekind = 0}
+    , O.relid = oid
+    , O.relkind = relkind
+    , O.tablesample = O.Null
+    , O.genericRangeExPost =
+        defaultRangeExGenericPost {O.selectedCols, O.inFromCl}
+    }
   where
     collids = map cAttnum $ tCols t
+    selectedCols = O.Bitmapset collids
+    inFromCl = O.PgBool True
     colnames = map cAttname $ tCols t
-    erefA = O.Alias { O.aliasname = tName t
-                    , O.colnames  = O.List colnames }
+    eref = O.Alias {O.aliasname = tName t, O.colnames = O.List colnames}
     oid = tOID t
     relkind = tKind t
 
 scanToRTE :: I.Operator -> O.RangeEx
-scanToRTE (I.SUBQUERYSCAN {I.targetlist})
-  = O.RTE_SUBQUERY
-      { O.alias = Nothing
-      , O.eref = erefA
-      , O.rtekind = 1
-      , O.subquery = O.Null
-      , O.security_barrier = O.PgBool False
-      , O.lateral = O.PgBool False
-      , O.inh = O.PgBool False
-      , O.inFromCl = O.PgBool False
-      , O.requiredPerms = 0
-      , O.checkAsUser = 0
-      , O.selectedCols = O.Bitmapset []
-      , O.insertedCols = O.Bitmapset []
-      , O.updatedCols  = O.Bitmapset []
-      , O.securityQuals = O.Null
-      }
+scanToRTE (I.SUBQUERYSCAN {I.targetlist}) =
+  O.RTE_SUBQUERY
+    { O.genericRangeExPre = defaultRangeExGenericPre {O.eref, O.rtekind = 1}
+    , O.subquery = O.Null
+    , O.security_barrier = O.PgBool False
+    , O.genericRangeExPost = defaultRangeExGenericPost {O.requiredPerms = 0}
+    }
   where
     colnum = length $ targetlist
-    erefA = O.Alias { O.aliasname = "SUBQUERY"
-                    , O.colnames  = O.List $ ["column"++show x | x <- [1..colnum]]
-                    }
+    eref =
+      O.Alias
+        { O.aliasname = "SUBQUERY"
+        , O.colnames = O.List $ ["column" ++ show x | x <- [1 .. colnum]]
+        }
 
-scanToRTE (I.WORKTABLESCAN {I.targetlist})
-  = O.RTE_SUBQUERY
-      { O.alias = Nothing
-      , O.eref = erefA
-      , O.rtekind = 1
-      , O.subquery = O.Null
-      , O.security_barrier = O.PgBool False
-      , O.lateral = O.PgBool False
-      , O.inh = O.PgBool False
-      , O.inFromCl = O.PgBool False
-      , O.requiredPerms = 0
-      , O.checkAsUser = 0
-      , O.selectedCols = O.Bitmapset []
-      , O.insertedCols = O.Bitmapset []
-      , O.updatedCols  = O.Bitmapset []
-      , O.securityQuals = O.Null
-      }
+scanToRTE (I.WORKTABLESCAN {I.targetlist}) =
+  O.RTE_SUBQUERY
+    { O.genericRangeExPre = defaultRangeExGenericPre {O.eref, O.rtekind = 1}
+    , O.subquery = O.Null
+    , O.security_barrier = O.PgBool False
+    , O.genericRangeExPost = defaultRangeExGenericPost {O.requiredPerms = 0}
+    }
   where
     colnum = length $ targetlist
-    erefA = O.Alias { O.aliasname = "cte"
-                    , O.colnames  = O.List $ ["column"++show x | x <- [1..colnum]]
-                    }
+    eref =
+      O.Alias
+        { O.aliasname = "cte"
+        , O.colnames = O.List $ ["column" ++ show x | x <- [1 .. colnum]]
+        }
 
-scanToRTE (I.VALUESSCAN {I.targetlist}) 
-  = O.RTE_VALUES
-      { O.alias = Nothing
-      , O.eref  = erefA
-      , O.rtekind = 5
-      , O.values_lists = O.Null
-      , O.coltypes = O.Null
-      , O.coltypmods = O.Null
-      , O.colcollations = O.Null
-      , O.lateral = O.PgBool False
-      , O.inh = O.PgBool False
-      , O.inFromCl = O.PgBool True
-      , O.requiredPerms = 2
-      , O.checkAsUser = 0
-      , O.selectedCols  = O.Bitmapset []
-      , O.insertedCols  = O.Bitmapset []
-      , O.updatedCols   = O.Bitmapset []
-      , O.securityQuals = O.Null
-      }
+scanToRTE (I.VALUESSCAN {I.targetlist}) =
+  O.RTE_VALUES
+    { O.genericRangeExPre = defaultRangeExGenericPre {O.eref, O.rtekind = 5}
+    , O.values_lists = O.Null
+    , O.coltypes = O.Null
+    , O.coltypmods = O.Null
+    , O.colcollations = O.Null
+    , O.genericRangeExPost =
+        defaultRangeExGenericPost {O.inFromCl = O.PgBool True}
+    }
   where
     colnum = length $ targetlist
-    erefA = O.Alias { O.aliasname = "VALUES"
-                    , O.colnames  = O.List $ ["column"++show x | x <- [1..colnum]]
-                    }
+    eref =
+      O.Alias
+        { O.aliasname = "VALUES"
+        , O.colnames = O.List $ ["column" ++ show x | x <- [1 .. colnum]]
+        }
 
-scanToRTE (I.CTESCAN {I.targetlist, I.qual, I.ctename, I.recursive})
-  = O.RTE_CTE
-      { O.alias = Nothing
-      , O.eref  = erefA
-      , O.rtekind = 6
-      , O.ctename = ctename
-      , O.ctelevelsup = 0
-      , O.self_reference = O.PgBool recursive
-      , O.coltypes = O.Null
-      , O.coltypmods = O.Null
-      , O.colcollations = O.Null
-      , O.lateral = O.PgBool False
-      , O.inh = O.PgBool False
-      , O.inFromCl = O.PgBool True
-      , O.requiredPerms = 2
-      , O.checkAsUser = 0
-      , O.selectedCols  = O.Bitmapset []
-      , O.insertedCols  = O.Bitmapset []
-      , O.updatedCols   = O.Bitmapset []
-      , O.securityQuals = O.Null
-      }
+scanToRTE (I.CTESCAN {I.targetlist, I.qual, I.ctename, I.recursive}) =
+  O.RTE_CTE
+    { O.genericRangeExPre = defaultRangeExGenericPre {O.eref, O.rtekind = 6}
+    , O.ctename = ctename
+    , O.ctelevelsup = 0
+    , O.self_reference = O.PgBool recursive
+    , O.coltypes = O.Null
+    , O.coltypmods = O.Null
+    , O.colcollations = O.Null
+    , O.genericRangeExPost =
+        defaultRangeExGenericPost {O.inFromCl = O.PgBool True}
+    }
   where
     colnum = length $ targetlist
     colnames = map I.targetresname targetlist
-    erefA = O.Alias { O.aliasname = ctename
-                    , O.colnames  = O.List colnames
-                    }
+    eref = O.Alias {O.aliasname = ctename, O.colnames = O.List colnames}
 
-scanToRTE (I.FUNCTIONSCAN {I.targetlist, I.funcordinality})
-  = O.RTE_FUNCTIONS
-      { O.alias = Nothing
-      , O.eref  = erefA
-      , O.rtekind = 3
-      , O._functions = O.Null
-      , O._funcordinality = O.PgBool funcordinality
-      , O.lateral = O.PgBool False
-      , O.inh     = O.PgBool False
-      , O.inFromCl = O.PgBool False
-      , O.requiredPerms = 2
-      , O.checkAsUser = 0
-      , O.selectedCols  = O.Bitmapset []
-      , O.insertedCols  = O.Bitmapset []
-      , O.updatedCols   = O.Bitmapset []
-      , O.securityQuals = O.Null
-      }
-    where
-      colnum = length $ targetlist
-      erefA = O.Alias { O.aliasname = "FUNCTION"
-                      , O.colnames  = O.List $ ["column"++show x | x <- [1..colnum]]
-                      }
+
+scanToRTE (I.FUNCTIONSCAN {I.targetlist, I.funcordinality}) =
+  O.RTE_FUNCTIONS
+    { O.genericRangeExPre = defaultRangeExGenericPre {O.eref, O.rtekind = 3}
+    , O._functions = O.Null
+    , O._funcordinality = O.PgBool funcordinality
+    , O.genericRangeExPost = defaultRangeExGenericPost
+    }
+  where
+    colnum = length $ targetlist
+    eref =
+      O.Alias
+        { O.aliasname = "FUNCTION"
+        , O.colnames = O.List $ ["column" ++ show x | x <- [1 .. colnum]]
+        }
+
 
 trOperator :: Rule I.Operator O.Plan
 trOperator n@(I.RESULT { I.targetlist=targetlist, I.resconstantqual})
