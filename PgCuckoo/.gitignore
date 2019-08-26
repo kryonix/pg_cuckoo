@@ -1,5 +1,5 @@
 .stack-work/
-cuckoo.cabal
 *~
+config.ini
 execute.sql
 explain.sql
