@@ -1,3 +1,3 @@
-# Changelog for generator
+# Changelog for PgCuckoo
 
 ## Unreleased changes
