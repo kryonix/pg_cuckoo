@@ -1,0 +1,61 @@
+name:                PgCuckoo
+version:             0.1.0.0
+# license:             BSD3
+author:              "Denis Hirn"
+maintainer:          "Denis Hirn <denis.hirn@uni-tuebingen.de>"
+copyright:           "2018-2019 Denis Hirn"
+github:              kryonix/pg_cuckoo
+stability:           Experimental
+category:            Database
+
+extra-source-files:
+- README.md
+- ChangeLog.md
+
+# Metadata used when publishing your package
+# synopsis:            Short description of your package
+# category:            Web
+
+# To avoid duplicated efforts in documentation and dealing with the
+# complications of embedding Haddock markup inside cabal files, it is
+# common to point users to the README.md file.
+synopsis:            PgCuckoo Plan Decorator for PostgreSQL Plan Forcing
+description:         Please see the README
+
+dependencies:
+- base >= 4.7 && < 5
+- megaparsec
+- pretty-show
+- HDBC
+- HDBC-postgresql == 2.3.2.6
+- mtl
+- containers
+- MissingH
+- ansi-wl-pprint
+- convertible
+
+library:
+  source-dirs: src
+
+executables:
+  cuckoo-exe:
+    main:                Main.hs
+    source-dirs:         app
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - PgCuckoo
+    - ConfigFile
+
+tests:
+  cuckoo-test:
+    main:                Spec.hs
+    source-dirs:         test
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - PgCuckoo
