@@ -4,7 +4,7 @@ version:             0.1.0.0
 author:              "Denis Hirn"
 maintainer:          "Denis Hirn <denis.hirn@uni-tuebingen.de>"
 copyright:           "2018-2019 Denis Hirn"
-github:              kryonix/pg_cuckoo
+github:              kryonix/pg_cuckoo/PgCuckoo
 stability:           Experimental
 category:            Database
 
