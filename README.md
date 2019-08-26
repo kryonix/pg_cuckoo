@@ -1,6 +1,6 @@
 # PgCuckoo
 
-This repository contains two building blocks for PostgreSQL plan forcing applications.
+PgCuckoo significantly alters PostgreSQL’s operation: we use the _planner hook_ to inject query plan trees from outside the system and have these foreign plans be executed by the system's  query executor.
 
 ## PostgreSQL Extension
 
@@ -15,5 +15,5 @@ The [PostgreSQL extension](PgExtension/) makes this functionality available at t
 This ensures that externally crafted trees perfectly mimic regular plans.
 
 
-1. [PgCuckoo: Laying Plan Eggs in PostgreSQL’s Nest](https://db.inf.uni-tuebingen.de/staticfiles/publications/pgcuckoo-laying-plan-eggs.pdf)
-2. [PgCuckoo – Injecting Physical Plans into PostgreSQL](https://db.inf.uni-tuebingen.de/staticfiles/publications/pgcuckoo.pdf)
+1. [PgCuckoo: Laying Plan Eggs in PostgreSQL’s Nest. Proc. SIGMOD 2019](https://db.inf.uni-tuebingen.de/staticfiles/publications/pgcuckoo-laying-plan-eggs.pdf)
+2. [PgCuckoo – Injecting Physical Plans into PostgreSQL. Proc. BTW 2019](https://db.inf.uni-tuebingen.de/staticfiles/publications/pgcuckoo.pdf)
