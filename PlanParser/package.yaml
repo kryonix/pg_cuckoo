@@ -1,0 +1,59 @@
+name:                planparser
+version:             0.1.0.0
+#license:             BSD3
+author:              "Denis Hirn"
+maintainer:          "denis.hirn@uni-tuebingen.de"
+copyright:           "2018 Denis Hirn"
+
+extra-source-files:
+- README.md
+- ChangeLog.md
+
+# Metadata used when publishing your package
+# synopsis:            Short description of your package
+# category:            Web
+
+# To avoid duplicated efforts in documentation and dealing with the
+# complications of embedding Haddock markup inside cabal files, it is
+# common to point users to the README.md file.
+description:         Please see the README
+
+dependencies:
+- base >= 4.7 && < 5
+- pretty-show
+- mtl
+- containers
+- MissingH
+- ansi-wl-pprint
+- convertible
+- PgCuckoo
+- megaparsec
+- Stack
+
+library:
+  source-dirs: src
+
+executables:
+  planparser-exe:
+    main:                Main.hs
+    source-dirs:         app
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - planparser
+    - PgCuckoo
+    - ConfigFile
+
+tests:
+  planparser-test:
+    main:                Spec.hs
+    source-dirs:         test
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - planparser
+    - PgCuckoo

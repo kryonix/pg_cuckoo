@@ -1,0 +1,29 @@
+digraph g
+{node [shape=rectangle];
+graph [fontname = "fira code"];
+node [fontname = "fira code"];
+edge [fontname = "fira code"];
+scan3 [label=<Scan: exams e<BR/>sid,
+course,
+curriculum,
+date,
+grade>];
+scan4 [label=<Scan: students s<BR/>id,name,major,year>];
+join2 [label=<⨝<BR/>l.sid = r.id>];
+scan7 [label=<Scan: exams e2<BR/>sid,
+course,
+curriculum,
+date,
+grade>];
+sel6 [label=<σ<BR/>s.id = l.sid>];
+groupby5 [label=<Γ<BR/>min(l.grade) AS "min">];
+depjoin1 [label=<⧑<BR/>l.grade = r.min>];
+proj0 [label=<Π<BR/>l.name AS "name",
+l.course AS "course">];
+join2 -> scan3;
+join2 -> scan4;
+sel6 -> scan7;
+groupby5 -> sel6;
+depjoin1 -> join2;
+depjoin1 -> groupby5;
+proj0 -> depjoin1;}

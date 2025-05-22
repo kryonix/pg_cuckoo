@@ -1,0 +1,5 @@
+.stack-work/
+PlanParser.cabal
+*~
+*.pdf
+*.sql

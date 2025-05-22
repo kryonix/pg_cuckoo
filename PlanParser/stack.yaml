@@ -1,0 +1,12 @@
+flags: {}
+
+packages:
+- .
+- ./../Cuckoo
+# - ../hdbc-postgresql
+
+extra-deps:
+- Stack-0.3.2
+- HDBC-postgresql-2.3.2.6
+
+resolver: lts-10.8

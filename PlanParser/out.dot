@@ -1,0 +1,33 @@
+graph g
+{node [shape=rectangle];
+graph [fontname = "fira code"];
+node [fontname = "fira code"];
+edge [fontname = "fira code"];
+scan2 [label="Scan: customer customer"];
+scan9 [label="Scan: customer customer"];
+proj8 [label="Π
+l.\"c_custkey\" AS \"c_custkey\""];
+d7 [label="D"];
+scan10 [label="Scan: orders orders"];
+join6 [label="⟕
+"];
+sel5 [label="σ
+(l.\"o_custkey\" = l.\"c_custkey\")"];
+groupby4 [label="Γ
+sum(l.\"o_totalprice\") AS \"sum\",
+l.\"c_custkey\" AS \"c_custkey\""];
+proj3 [label="Π
+l.\"sum\" AS \"sum\",l.\"c_custkey\" AS \"c_custkey\""];
+join1 [label="⟕
+(l.\"c_custkey\" = r.\"c_custkey\")"];
+limit0 [label="Limit"];
+proj8 -- scan9;
+d7 -- proj8;
+join6 -- d7;
+join6 -- scan10;
+sel5 -- join6;
+groupby4 -- sel5;
+proj3 -- groupby4;
+join1 -- scan2;
+join1 -- proj3;
+limit0 -- join1;}
