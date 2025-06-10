@@ -11,6 +11,7 @@ Maintainer  : Denis Hirn
 
 module Database.PgCuckoo.Inference ( generatePlan ) where
 
+import           Control.Monad (when, liftM, forM, unless)
 import           Database.PgCuckoo.OperSem
 import           Database.PgCuckoo.GetTable as Tbl
 import qualified Database.PgCuckoo.InAST    as I
@@ -79,10 +80,11 @@ getRTableRow (tbl, idx) = do
 
 data Log = Log { errors :: [ String ] }
 
+instance Semigroup Log where
+  (Log e1) <> (Log e2) = Log (e1++e2)
+
 instance Monoid Log where
   mempty = Log []
-  (Log e1) `mappend` (Log e2) = Log (e1++e2)
-
 
 logError :: Rule String ()
 logError err = tell (Log [err])
@@ -149,7 +151,7 @@ trPlannedStmt (I.PlannedStmt op subplan) tbls valuesScan = do
 
   let numTables = length tbls
   let context'' = const $ context { rtables=tables
-                                 , valueScans= map (\(a, b) -> (a, fromIntegral b)) 
+                                 , valueScans= map (\(a, b) -> (a, fromIntegral b))
                                                 $ zip valuesScan [numTables..numTables+(length valuesScan)]
                                  }
 
@@ -161,7 +163,7 @@ trPlannedStmt (I.PlannedStmt op subplan) tbls valuesScan = do
     return plans'''
 
   let context' = const $ context { rtables=tables
-                                 , valueScans= map (\(a, b) -> (a, fromIntegral b)) 
+                                 , valueScans= map (\(a, b) -> (a, fromIntegral b))
                                                 $ zip valuesScan [numTables..numTables+(length valuesScan)]
                                  , subplanLst = subplan''
                                  }
@@ -949,7 +951,7 @@ trOperator (I.NESTLOOP {I.targetlist, I.joinType, I.inner_unique, I.joinquals, I
                       }
 
     return $ O.NESTLOOP
-              { O.genericPlan = O.defaultPlan 
+              { O.genericPlan = O.defaultPlan
                                   { O.targetlist = O.List targetlist'
                                   , O.lefttree = Just lefttree'
                                   , O.righttree = Just righttree''
@@ -989,13 +991,13 @@ trOperator (I.MERGEJOIN {I.targetlist, I.qual, I.joinType, I.inner_unique, I.joi
                       I.RIGHT -> 3
                       I.SEMI  -> 4
                       I.ANTI  -> 5
-    
+
     let mergeStrategies' = map (\x -> if I.mergeASC x then 1 else -1) mergeStrategies
     let mergeNullsFirst  = map (O.pgConvert . I.mergeNullsFirst) mergeStrategies
     mergeCollations      <- mapM getExprCollation mergeclauses'
     let mergeFamilies    = replicate (length mergeclauses) 0
     return $ O.MERGEJOIN
-              { O.genericPlan = O.defaultPlan 
+              { O.genericPlan = O.defaultPlan
                                   { O.targetlist = O.List targetlist'
                                   , O.qual = O.List qual'
                                   , O.lefttree = Just lefttree'
@@ -1024,7 +1026,7 @@ trOperator (I.UNIQUE {I.operator, I.uniqueCols})
     ops <- mapM ((liftM fst) . searchOperator) $ zip grpTargets (repeat "=")
 
     return $ O.UNIQUE
-              { O.genericPlan = O.defaultPlan 
+              { O.genericPlan = O.defaultPlan
                                 { O.targetlist = O.List targetlist
                                 , O.lefttree = Just operator' }
               , O.numCols = fromIntegral $ length uniqueCols
@@ -1037,7 +1039,7 @@ trOperator s@(I.SUBQUERYSCAN {I.targetlist, I.qual, I.subplan})
     qual' <- mapM trExpr qual
     subplan' <- trOperator subplan
 
-    targetlist' <- forM (zip targetlist [1..]) 
+    targetlist' <- forM (zip targetlist [1..])
                 $ \x -> do
                   let (e, n) = x
                   case e of
@@ -1102,7 +1104,7 @@ trOperator t@(I.FUNCTIONSCAN {I.targetlist, I.qual, I.functions, I.funcordinalit
                           , O.funccolcollations = O.Null
                           , O.funcparams = O.Bitmapset [] }) functions'
 
-    targetlist' <- forM (zip targetlist [1..]) 
+    targetlist' <- forM (zip targetlist [1..])
                 $ \x -> do
                   let (e, n) = x
                   case e of
@@ -1151,7 +1153,7 @@ trOperator s@(I.VALUESSCAN {I.targetlist, I.qual, I.values_list})
     qual'       <- mapM trExpr qual
     values_list' <- mapM (mapM trExpr) values_list
 
-    targetlist' <- forM (zip targetlist [1..]) 
+    targetlist' <- forM (zip targetlist [1..])
                     $ \x -> do
                       let (e, n) = x
                       case e of
@@ -1305,7 +1307,7 @@ trOperator (I.GATHERMERGE {I.targetlist, I.operator, I.num_workers, I.rescan_par
 
     incrParam 1
     setParallelMode True
-    
+
     let numCols = length sortCols
 
     when (length targetlist' < numCols)
@@ -1463,9 +1465,9 @@ trOperator (I.SETOP {I.targetlist, I.qual, I.setopStrategy, I.setOpCmd, I.lefttr
 trOperator (I.PARALLEL {I.operator})
   = do
     operator' <- trOperator operator
-    let operator'' = operator' 
-                    { O.genericPlan = 
-                      (O.genericPlan operator') 
+    let operator'' = operator'
+                    { O.genericPlan =
+                      (O.genericPlan operator')
                       { O.parallel_aware=O.PgTrue
                       , O.parallel_safe=O.PgTrue
                       }
@@ -1535,7 +1537,7 @@ searchOperator (typ', op)
     -- findRow, because we need to perform a search using multiple qualifications.
     td <- getRTableData ()
     let table = pg_operators td
-    
+
     -- Try to find function in pg_operator by name and argument types
     let row = filter (\x -> x M.! "oprname" == (DB.toSql op)
                          && x M.! "oprleft" == (DB.toSql typ)
@@ -1716,7 +1718,7 @@ trExpr n@(I.FUNCEXPR { I.funcname, I.funcargs })
     -- Check if argument count is correct. Error if mismatch
     when (pronargs /= length funcargs)
       $ error $ "FUNCEXPR error: expected "
-                ++ show pronargs 
+                ++ show pronargs
                 ++ " arguments but got "
                 ++ show (length funcargs)
                 ++ "\n" ++ PP.ppShow n
@@ -1783,7 +1785,7 @@ trExpr n@(I.OPEXPR { I.oprname, I.oprargs })
                 ++ "' for given arguments does not exist!"
                 ++ " Check types of arguments. "
                 ++ "\n" ++ PP.ppShow n
-    
+
     let oprcode = fromSql $ head row M.! "oprcode"
     -- Try to find function in pg_proc by name
     procrow <- getRTableRow (pg_proc, findRow "proname" oprcode)
@@ -1846,7 +1848,7 @@ trExpr n@(I.AGGREF {I.aggname, I.aggargs, I.aggdirectargs, I.aggorder, I.aggdist
     -- Check if argument count is correct. Error if mismatch
     when (pronargs /= length aggargs)
       $ error $ "AGGREF error: expected "
-                ++ show pronargs 
+                ++ show pronargs
                 ++ " arguments but got "
                 ++ show (length aggargs)
                 ++ "\n" ++ PP.ppShow n
@@ -1928,7 +1930,7 @@ trExpr n@(I.WINDOWFUNC {I.winname, I.winargs, I.aggfilter, I.winref, I.winstar})
     -- Check if argument count is correct. Error if mismatch
     when (pronargs /= length winargs)
       $ error $ "AGGREF error: expected "
-                ++ show pronargs 
+                ++ show pronargs
                 ++ " arguments but got "
                 ++ show (length winargs)
                 ++ "\n" ++ PP.ppShow n

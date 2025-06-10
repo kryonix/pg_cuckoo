@@ -20,6 +20,7 @@ module Database.PgCuckoo.Validate
     , isValidExpr
     ) where
 
+import Control.Monad (when)
 import Database.PgCuckoo.OperSem
 import Database.PgCuckoo.InAST as I
 
@@ -30,9 +31,11 @@ import qualified Text.Show.Pretty as PP
 
 data Log = Log { errors :: [ String ] }
 
+instance Semigroup Log where
+    (Log e1) <> (Log e2) = Log (e1++e2)
+
 instance Monoid Log where
     mempty = Log []
-    (Log e1) `mappend` (Log e2) = Log (e1++e2)
 
 logError :: Rule String ()
 logError err = tell (Log [err])
@@ -52,7 +55,7 @@ validatePlannedStmt op = let
 
 -- | Checks whether an operator is valid or not
 isValidOperator :: I.Operator -> Bool
-isValidOperator op = null $ validateOperator op 
+isValidOperator op = null $ validateOperator op
 
 -- | Validates an operator and returns all errors
 validateOperator :: I.Operator -> [String]
@@ -85,7 +88,7 @@ validateExpr op = let
   = do
     mapM_ (~~~>) targetlist
     mapM_ (~~>) qual
-    when (null scanrelation) 
+    when (null scanrelation)
       $ logError $ "SEQSCAN error: scanrelation is empty"
 
 (~>) (RESULT { targetlist, resconstantqual })
@@ -350,8 +353,8 @@ validateExpr op = let
     when (null oprname) $ logError $ "OPEXPR error: oprname is empty"
     when (null oprargs) $ logError $ "OPEXPR error: no arguments found"
                                     ++ "\n" ++ PP.ppShow o
-    when (length oprargs > 2) 
-      $ logError $ "OPEXPR error: expected one or two arguments but got " 
+    when (length oprargs > 2)
+      $ logError $ "OPEXPR error: expected one or two arguments but got "
                   ++ show (length oprargs)
                   ++ "\n" ++ PP.ppShow o
     mapM_ (~~>) oprargs

@@ -1,7 +1,6 @@
 module Main where
 
 import System.Environment
-import Data.ConfigFile
 import Data.Either.Utils
 
 import Control.Monad
@@ -21,7 +20,7 @@ import qualified Database.PgCuckoo.InAST as A
 
 const1 :: A.Operator
 const1 = A.RESULT
-          { A.targetlist = 
+          { A.targetlist =
               [ A.TargetEntry
                 { A.targetexpr = A.CONST "42" "int4"
                 , A.targetresname = "valid"
@@ -58,7 +57,7 @@ seq1 = A.SEQSCAN
                 , A.targetresname = "foo"
                 , A.resjunk = False
                 }
-            , A.TargetEntry 
+            , A.TargetEntry
                 { A.targetexpr = A.VAR {A.varTable="grp", A.varColumn="b"}
                 , A.targetresname = "bar"
                 , A.resjunk = False
@@ -79,8 +78,8 @@ func1 :: A.Operator
 func1 = A.RESULT
           { A.targetlist =
               [ A.TargetEntry
-                { A.targetexpr = 
-                    A.FUNCEXPR 
+                { A.targetexpr =
+                    A.FUNCEXPR
                       { A.funcname="int4pl"
                       , A.funcargs=
                           [ A.CONST "1" "int4"
@@ -102,7 +101,7 @@ seq3 = A.SEQSCAN
                 , A.targetresname = "foo"
                 , A.resjunk = False
                 }
-            , A.TargetEntry 
+            , A.TargetEntry
                 { A.targetexpr = A.VAR {A.varTable="grp", A.varColumn="b"}
                 , A.targetresname = "bar"
                 , A.resjunk = False
@@ -114,7 +113,7 @@ seq3 = A.SEQSCAN
                       , A.funcargs=
                           [ A.VAR {A.varTable="grp", A.varColumn="a"}
                           , A.VAR {A.varTable="grp", A.varColumn="b"}
-                          ] 
+                          ]
                       }
                 , A.targetresname = "baz"
                 , A.resjunk = False
@@ -132,7 +131,7 @@ seq4 = A.SEQSCAN
                 , A.targetresname = "foo"
                 , A.resjunk = False
                 }
-            , A.TargetEntry 
+            , A.TargetEntry
                 { A.targetexpr = A.VAR {A.varTable="grp", A.varColumn="b"}
                 , A.targetresname = "bar"
                 , A.resjunk = False
@@ -150,7 +149,7 @@ seq4 = A.SEQSCAN
                                   , A.funcargs=
                                       [ A.VAR {A.varTable="grp", A.varColumn="a"}
                                       , A.VAR {A.varTable="grp", A.varColumn="b"}
-                                      ] 
+                                      ]
                                   }
                                 ]
                             }
@@ -172,14 +171,14 @@ seq5 = A.SEQSCAN
                 , A.targetresname = "foo"
                 , A.resjunk = False
                 }
-            , A.TargetEntry 
+            , A.TargetEntry
                 { A.targetexpr = A.VAR {A.varTable="grp", A.varColumn="b"}
                 , A.targetresname = "bar"
                 , A.resjunk = False
                 }
             ]
         , A.qual =
-            [ A.FUNCEXPR 
+            [ A.FUNCEXPR
                 { A.funcname = "int4lt"
                 , A.funcargs =
                     [ A.VAR {A.varTable="grp", A.varColumn="a"}
@@ -194,7 +193,7 @@ func2 :: A.Operator
 func2 = A.RESULT
           { A.targetlist =
               [ A.TargetEntry
-                { A.targetexpr = 
+                { A.targetexpr =
                     A.OPEXPR
                       { A.oprname="<"
                       , A.oprargs=
@@ -217,7 +216,7 @@ sort1 = A.SORT
                 , A.targetresname = "foo"
                 , A.resjunk = False
                 }
-            , A.TargetEntry 
+            , A.TargetEntry
                 { A.targetexpr = A.VAR {A.varTable="grp", A.varColumn="b"}
                 , A.targetresname = "bar"
                 , A.resjunk = False
@@ -231,7 +230,7 @@ sort1 = A.SORT
                     , A.targetresname = "foo"
                     , A.resjunk = False
                     }
-                , A.TargetEntry 
+                , A.TargetEntry
                     { A.targetexpr = A.VAR {A.varTable="grp", A.varColumn="b"}
                     , A.targetresname = "bar"
                     , A.resjunk = False
@@ -408,7 +407,7 @@ unique1 :: A.Operator
 unique1 = A.UNIQUE
           { A.operator =
               A.SEQSCAN
-                { A.targetlist = 
+                { A.targetlist =
                     [ A.TargetEntry
                       { A.targetexpr = A.VAR "grp" "a"
                       , A.targetresname = "a"
@@ -731,7 +730,7 @@ bitmapor1 = A.BITMAPHEAPSCAN
                 , A.resjunk = False
                 }
               ]
-            , A.bitmapqualorig = 
+            , A.bitmapqualorig =
                 [ A.OR
                   { A.args =
                     [ A.OPEXPR
@@ -1152,7 +1151,7 @@ gather1 = A.GATHER
             , A.TargetEntry
               { A.targetexpr = A.VAR "OUTER_VAR" "b"
               , A.targetresname = "b"
-              , A.resjunk = False 
+              , A.resjunk = False
               }
             ]
           , A.num_workers = 999
@@ -1168,10 +1167,10 @@ gather1 = A.GATHER
               , A.TargetEntry
                 { A.targetexpr = A.VAR "indexed" "b"
                 , A.targetresname = "b"
-                , A.resjunk = False 
+                , A.resjunk = False
                 }
               ]
-            , A.qual = 
+            , A.qual =
               [ {-A.OPEXPR
                 { A.oprname = "="
                 , A.oprargs =
@@ -1196,12 +1195,12 @@ gathermerge1 = A.GATHERMERGE
                   , A.TargetEntry
                     { A.targetexpr = A.VAR "OUTER_VAR" "b"
                     , A.targetresname = "b"
-                    , A.resjunk = False 
+                    , A.resjunk = False
                     }
                   , A.TargetEntry
                     { A.targetexpr = A.VAR "OUTER_VAR" "c"
                     , A.targetresname = "c"
-                    , A.resjunk = False 
+                    , A.resjunk = False
                     }
                   ]
                 , A.num_workers = 999
@@ -1216,12 +1215,12 @@ gathermerge1 = A.GATHERMERGE
                       , A.TargetEntry
                         { A.targetexpr = A.VAR "OUTER_VAR" "b"
                         , A.targetresname = "b"
-                        , A.resjunk = False 
+                        , A.resjunk = False
                         }
                       , A.TargetEntry
                         { A.targetexpr = A.VAR "OUTER_VAR" "c"
                         , A.targetresname = "c"
-                        , A.resjunk = False 
+                        , A.resjunk = False
                         }
                       ]
                     , A.operator =
@@ -1235,12 +1234,12 @@ gathermerge1 = A.GATHERMERGE
                           , A.TargetEntry
                             { A.targetexpr = A.VAR "indexed" "b"
                             , A.targetresname = "b"
-                            , A.resjunk = False 
+                            , A.resjunk = False
                             }
                           , A.TargetEntry
                             { A.targetexpr = A.VAR "indexed" "c"
                             , A.targetresname = "c"
-                            , A.resjunk = False 
+                            , A.resjunk = False
                             }
                           ]
                         , A.qual = []
@@ -1256,7 +1255,7 @@ paragg :: A.Operator
 paragg = A.AGG
         { A.targetlist =
           [ A.TargetEntry
-            { A.targetexpr = 
+            { A.targetexpr =
               A.AGGREF
               { A.aggname = "sum"
               , A.aggargs =
@@ -1295,7 +1294,7 @@ paragg = A.AGG
                   { A.aggname = "sum"
                   , A.aggargs =
                     [ A.TargetEntry
-                      { A.targetexpr = A.VAR "OUTER_VAR" "a" 
+                      { A.targetexpr = A.VAR "OUTER_VAR" "a"
                       , A.targetresname = "sum"
                       , A.resjunk = False
                       }
@@ -1339,7 +1338,7 @@ ctescan2 :: A.PlannedStmt
 ctescan2 = A.PlannedStmt
             { A.planTree =
               A.NESTLOOP
-              { A.targetlist = 
+              { A.targetlist =
                 [ A.TargetEntry
                   { A.targetexpr = A.VAR "OUTER_VAR" "x"
                   , A.targetresname = "x"
@@ -2052,8 +2051,8 @@ neumannQ1'' = A.PlannedStmt
 --------------------------------------------------------------------------------
 -- NEUMANN unnesting Q2
 
-seqStudentsFilter = seqStudents 
-                    { A.qual = 
+seqStudentsFilter = seqStudents
+                    { A.qual =
                       [ A.OR
                         { A.args =
                           [ A.OPEXPR
@@ -2326,7 +2325,7 @@ seqNation = A.SEQSCAN
               , defCol "nation" "n_regionkey"
               , defCol "nation" "n_comment"
               ]
-            , A.qual = 
+            , A.qual =
               [ A.OPEXPR
                 { A.oprname = "="
                 , A.oprargs =
@@ -2734,7 +2733,7 @@ tpc21j4 = A.HASHJOIN
           , A.joinquals =
             [ A.OPEXPR
               { A.oprname = "<>"
-              , A.oprargs = 
+              , A.oprargs =
                 [ A.VAR "OUTER_VAR" "l_suppkey"
                 , A.VAR "INNER_VAR" "l_suppkey"
                 ]
@@ -2831,7 +2830,7 @@ tpc21j5 = A.HASHJOIN
           , A.joinquals =
             [ A.OPEXPR
               { A.oprname = "<>"
-              , A.oprargs = 
+              , A.oprargs =
                 [ A.VAR "OUTER_VAR" "l_suppkey"
                 , A.VAR "INNER_VAR" "l_suppkey"
                 ]
@@ -3090,7 +3089,7 @@ hashJoin_H_customer
     , A.joinType = A.INNER
     , A.inner_unique = False
     , A.joinquals = []
-    , A.hashclauses = 
+    , A.hashclauses =
       [A.OPEXPR
         { A.oprname = "="
         , A.oprargs =
@@ -3144,7 +3143,7 @@ sortSIG = A.SORT
             , defCol "OUTER_VAR" "c_name"
             ]
           , A.operator = hashJoin_H_customer
-          , A.sortCols = 
+          , A.sortCols =
             [ A.SortEx 27 True False
             , A.SortEx 17 True False
             ]
@@ -3301,13 +3300,13 @@ checkAndGenerate authStr op = do
 
   -- Compile constants
   consts' <- mapM (\x -> L.parseConst authStr x >>= \p -> return (x, p)) $ lgconsts consts
-  
+
   -- Debug output of constants
   putStrLn $ PP.ppShow consts'
 
   -- Infere output AST
   let infered = generatePlan tableDataR consts' (lgTableNames consts) (lgScan consts) (A.PlannedStmt op [])
-  
+
   -- Print AST structure as well as the postgres plan
   putStrLn $ PP.ppShow infered
   let pgplan = gprint infered
@@ -3337,7 +3336,7 @@ checkAndGenerateStmt authStr op = do
 
   -- Compile constants
   consts' <- mapM (\x -> L.parseConst authStr x >>= \p -> return (x, p)) $ lgconsts consts
-  
+
   -- Debug output of constants
   putStrLn $ PP.ppShow consts'
 
@@ -3355,14 +3354,7 @@ checkAndGenerateStmt authStr op = do
 
 main :: IO ()
 main = do
-    cmdArgs <- getArgs
-    let configFile =
-            case cmdArgs Main.!! 0 of
-                Just j -> j -- config.ini file
-                Nothing -> error "please provide a config file"
-    config <- readfile emptyCP configFile
-    let cp = forceEither config
-    let authStr = forceEither $ get cp "Main" "dbauth" :: String
+    let authStr = "host=localhost dbname=foo" -- Change this to your DB connection string
 
     checkAndGenerate authStr seq1
     -- Main.checkAndGenerateStmt authStr sigPlan

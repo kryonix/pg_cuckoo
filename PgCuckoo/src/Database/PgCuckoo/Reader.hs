@@ -17,7 +17,7 @@ module Database.PgCuckoo.Reader
     ) where
 
 import           Prelude hiding (sequence)
-import           Text.Megaparsec
+import           Text.Megaparsec hiding(chunk)
 import           Text.Megaparsec.Char as M
 import qualified Text.Megaparsec.Char.Lexer as L
 import           Control.Applicative as A hiding (many)
@@ -86,7 +86,7 @@ parseLog :: String -> [Chunk]
 parseLog str =
     case parse program "" str of
         -- Left e  -> error $ parseErrorPretty' (Prelude.drop ((unPos $ sourceColumn $ E.head $ errorPos e)-30) str) e
-        Left e  -> error $ parseErrorPretty' str e
+        Left e  -> error $ errorBundlePretty e
         Right r -> r
 
 
@@ -149,10 +149,10 @@ boolean = (tTrue >> return (Bool True))
 str :: Parser Value
 str = do
     res <- tQuotes $ do
-                        f <- many ((alphaNumChar 
-                                    <|> qMark 
-                                    <|> M.char '=' 
-                                    <|> M.char '+' 
+                        f <- many ((alphaNumChar
+                                    <|> qMark
+                                    <|> M.char '='
+                                    <|> M.char '+'
                                     <|> M.char '\\'
                                     <|> M.char '<'
                                     <|> M.char '_'
@@ -205,7 +205,7 @@ unit = do
 identifier :: Parser String
 identifier = lexeme p
     where
-        p = (:) <$> (underscore <|> sp <|> star <|> letterChar <|> qMark) 
+        p = (:) <$> (underscore <|> sp <|> star <|> letterChar <|> qMark)
                     <*> many ((underscore <|> sp <|> star <|> qMark <|> alphaNumChar) <* M.space)
 
 

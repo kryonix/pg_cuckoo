@@ -27,7 +27,7 @@ dependencies:
 - megaparsec
 - pretty-show
 - HDBC
-- HDBC-postgresql == 2.3.2.6
+- HDBC-postgresql
 - mtl
 - containers
 - MissingH
@@ -47,7 +47,6 @@ executables:
     - -with-rtsopts=-N
     dependencies:
     - PgCuckoo
-    - ConfigFile
 
 tests:
   cuckoo-test:

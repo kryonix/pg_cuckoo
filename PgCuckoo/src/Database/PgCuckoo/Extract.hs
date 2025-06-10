@@ -23,11 +23,12 @@ data Log = Log { lgconsts :: [I.Expr]     -- ^ list of all 'CONST' nodes in the 
                }
   deriving(Show)
 
+instance Semigroup Log where
+    (Log e1 e2 e3) <> (Log n1 n2 n3)
+      = Log (e1++n1) (e2++n2) (e3++n3)
+
 instance Monoid Log where
     mempty = Log [] [] []
-    (Log e1 e2 e3)
-      `mappend` (Log n1 n2 n3)
-        = Log (e1++n1) (e2++n2) (e3++n3)
 
 logConst :: Rule I.Expr ()
 logConst expr = tell (Log [expr] [] [])
